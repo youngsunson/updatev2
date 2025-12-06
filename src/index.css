@@ -40,10 +40,11 @@ body {
   flex-shrink: 0;
 }
 
+/* হেডারের উপরের অংশ: বামে মেনু, মাঝে টাইটেল, ডানে স্পেসার */
 .header-top {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
 }
 
@@ -54,42 +55,7 @@ body {
 .app-title h1 { font-size: 22px; font-weight: 700; margin: 0; }
 .app-title p { font-size: 13px; opacity: 0.9; margin: 0; }
 
-.icon-btn-small {
-  background: rgba(255,255,255,0.2);
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  color: white;
-  cursor: pointer;
-  font-size: 25px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Toolbar – দুই লাইন: উপরে মেনু + পরীক্ষা, নিচে ফিল্টার */
-.toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: rgba(255,255,255,0.15);
-  padding: 8px;
-  border-radius: 12px;
-}
-
-.toolbar-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.toolbar-bottom {
-  display: flex;
-  justify-content: flex-start;
-}
-
-/* ছোট মেনু বাটন ☰ */
+/* হেডারের মেনু বাটন – ☰ */
 .menu-btn {
   width: 32px;
   height: 32px;
@@ -111,7 +77,52 @@ body {
   transform: translateY(-1px);
 }
 
-/* ছোট view filter (সব / শুধু বানান / শুধু বিরামচিহ্ন) */
+/* হেডারে থাকা মেনু বাটনের জন্য সামান্য মার্জিন */
+.header-menu-btn {
+  margin-right: 8px;
+}
+
+/* ডান পাশে স্পেসার – মেনু বাটনের সমান চওড়া, যাতে টাইটেল একদম মাঝখানে থাকে */
+.header-spacer {
+  width: 32px;
+}
+
+.icon-btn-small {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  color: white;
+  cursor: pointer;
+  font-size: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Toolbar – দুই লাইন: উপরে পরীক্ষা বাটন, নিচে ফিল্টার */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255,255,255,0.15);
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.toolbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.toolbar-bottom {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* view filter (সব / শুধু বানান / শুধু বিরামচিহ্ন) */
 .view-filter {
   display: inline-flex;
   background: rgba(255,255,255,0.2);
@@ -143,7 +154,7 @@ body {
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
 }
 
-/* পুরনো icon-btn স্টাইল (এখন toolbar-এ ব্যবহার হচ্ছে না, কিন্তু রেখে দিচ্ছি ভবিষ্যতের জন্য) */
+/* পুরনো icon-btn – ভবিষ্যতের প্রয়োজনের জন্য রাখা */
 .icon-btn {
   width: 46px;
   height: 46px;
@@ -175,6 +186,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 
+/* পরীক্ষা বাটন */
 .btn-check {
   background: white;
   color: #667eea;
@@ -351,7 +363,7 @@ body {
 }
 .orange-btn {
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-color: #6eead7;
+  border-color: #6ee7b7;
   color: #065f46;
 }
 
@@ -423,7 +435,6 @@ body {
 .instructions-header { background: linear-gradient(135deg, #0d9488 0%, #06b6d4 100%); }
 .tone-header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
 .style-header { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); }
-/* নতুন main menu header */
 .menu-header { background: linear-gradient(135deg, #4b5563 0%, #111827 100%); }
 
 .modal-body { padding: 20px; overflow-y: auto; }
