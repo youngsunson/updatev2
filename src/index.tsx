@@ -6,36 +6,40 @@ import './index.css';
 /*                                TYPES                                       */
 /* -------------------------------------------------------------------------- */
 
+type DocType = 'generic' | 'academic' | 'official' | 'marketing' | 'social';
+
 interface Correction {
   wrong: string;
   suggestions: string[];
-  position?: number; // global character index in full document text
+  position?: number; // 0-based word index in full document
 }
 
 interface ToneSuggestion {
   current: string;
   suggestion: string;
   reason: string;
-  position?: number;
+  position?: number; // 0-based word index (approx)
 }
 
 interface StyleSuggestion {
   current: string;
   suggestion: string;
   type: string;
-  position?: number;
+  position?: number; // 0-based word index (approx)
+}
+
+interface StyleMixingCorrection {
+  current: string;
+  suggestion: string;
+  type: string;
+  position?: number; // 0-based word index
 }
 
 interface StyleMixing {
   detected: boolean;
   recommendedStyle?: string;
   reason?: string;
-  corrections?: Array<{
-    current: string;
-    suggestion: string;
-    type: string;
-    position?: number;
-  }>;
+  corrections?: StyleMixingCorrection[];
 }
 
 interface PunctuationIssue {
@@ -43,14 +47,14 @@ interface PunctuationIssue {
   currentSentence: string;
   correctedSentence: string;
   explanation: string;
-  position?: number;
+  position?: number; // start word index of the sentence (optional)
 }
 
 interface EuphonyImprovement {
   current: string;
   suggestions: string[];
   reason: string;
-  position?: number;
+  position?: number; // 0-based word index (first word of phrase)
 }
 
 interface ContentAnalysis {
@@ -60,49 +64,62 @@ interface ContentAnalysis {
   suggestions?: string[];
 }
 
-/* ডকুমেন্ট টাইপ এবং ভিউ ফিল্টার */
-type DocumentType = 'general' | 'academic' | 'official' | 'marketing' | 'social';
-type ViewFilter = 'all' | 'spelling' | 'punctuation';
+/* -------------------------------------------------------------------------- */
+/*                       DOC TYPE CONFIG & HELPERS                            */
+/* -------------------------------------------------------------------------- */
 
-const DOC_TYPE_LABELS: Record<DocumentType, string> = {
-  general: 'সাধারণ লেখা',
-  academic: 'একাডেমিক লেখা',
-  official: 'অফিসিয়াল চিঠি',
-  marketing: 'মার্কেটিং কপি',
-  social: 'সোশ্যাল মিডিয়া পোস্ট'
+const DOC_TYPE_CONFIG: Record<
+  DocType,
+  { 
+    label: string; 
+    description: string; 
+    defaultTone: string; 
+    mainHint: string;
+    contentHint: string;
+  }
+> = {
+  generic: {
+    label: 'সাধারণ লেখা',
+    description: 'যেকোনো সাধারণ লেখা – নিরপেক্ষভাবে বিশ্লেষণ করবে।',
+    defaultTone: '',
+    mainHint: 'এটি একটি সাধারণ বাংলা লেখা হিসেবে বিবেচনা করুন।',
+    contentHint: 'সাধারণ লেখার ক্ষেত্রে মূল বক্তব্য পরিষ্কার আছে কি না এবং গঠনগত যৌক্তিকতা আছে কি না দেখুন।'
+  },
+  academic: {
+    label: 'একাডেমিক লেখা',
+    description: 'গবেষণা পত্র, প্রবন্ধ, থিসিস ইত্যাদি।',
+    defaultTone: 'academic',
+    mainHint: 'এটি একাডেমিক/গবেষণামূলক লেখা হিসেবে বিবেচনা করুন। ভাষার শুদ্ধতা, টার্মিনোলজি এবং আনুষ্ঠানিকতা বেশি গুরুত্ব দিন।',
+    contentHint: 'একাডেমিক লেখার ক্ষেত্রে ভূমিকা, যুক্তি, উদাহরণ ও উপসংহার আছে কি না এবং রেফারেন্স/উৎস উল্লেখ আছে কি না লক্ষ্য করুন।'
+  },
+  official: {
+    label: 'অফিশিয়াল চিঠি',
+    description: 'দাপ্তরিক আবেদন, নোটিশ, অফিসিয়াল ইমেইল ইত্যাদি।',
+    defaultTone: 'formal',
+    mainHint: 'এটি একটি অফিসিয়াল/দাপ্তরিক লেখা হিসেবে বিবেচনা করুন। ভদ্রতা, সম্মানসূচক সম্বোধন ও স্পষ্টতা গুরুত্ব দিন।',
+    contentHint: 'অফিশিয়াল লেখায় প্রাপক, বিষয়, উদ্দেশ্য, প্রয়োজনীয় তথ্য ও বিনীত উপসংহার আছে কি না দেখুন।'
+  },
+  marketing: {
+    label: 'মার্কেটিং কপি',
+    description: 'বিজ্ঞাপন, সেলস পেজ, প্রমোশনাল লেখা ইত্যাদি।',
+    defaultTone: 'persuasive',
+    mainHint: 'এটি একটি মার্কেটিং/প্রমোশনাল লেখা হিসাবে ধরুন। প্রভাবশালী, আকর্ষণীয় ও স্পষ্ট বার্তার ওপর গুরুত্ব দিন।',
+    contentHint: 'মার্কেটিং কনটেন্টে প্রস্তাবিত পণ্য/সেবা, এর উপকারিতা, স্পষ্ট কল-টু-অ্যাকশন (CTA) এবং লক্ষ্যমাত্রা পাঠকের জন্য উপযোগী ভাষা আছে কি না দেখুন।'
+  },
+  social: {
+    label: 'সোশ্যাল মিডিয়া পোস্ট',
+    description: 'ফেসবুক, ইনস্টাগ্রাম, টুইটার ইত্যাদির লেখা।',
+    defaultTone: 'informal',
+    mainHint: 'এটি একটি সোশ্যাল মিডিয়া পোস্ট হিসেবে বিবেচনা করুন। স্বাভাবিক, বন্ধুত্বপূর্ণ ও আকর্ষণীয় ভাষা গুরুত্ব দিন।',
+    contentHint: 'সোশ্যাল মিডিয়া পোস্টে পরিষ্কার বার্তা, উপযুক্ত টোন, ইঙ্গেজমেন্ট বাড়ানোর উপাদান (প্রশ্ন, CTA, হ্যাশট্যাগ ইত্যাদি) আছে কি না দেখুন।'
+  }
 };
+
+const getDocTypeLabel = (t: DocType) => DOC_TYPE_CONFIG[t].label;
 
 /* -------------------------------------------------------------------------- */
 /*                        PROMPT BUILDERS                                     */
 /* -------------------------------------------------------------------------- */
-
-const getDocTypeInstructions = (docType: DocumentType) => {
-  switch (docType) {
-    case 'academic':
-      return `লেখাটি সম্ভবত একাডেমিক/শিক্ষামূলক। 
-- যুক্তি, রেফারেন্স ও নিরপেক্ষ টোন বজায় রাখুন।
-- অপ্রয়োজনীয় আবেগপ্রবণ শব্দ এড়িয়ে চলুন।
-- ভাষা স্পষ্ট ও প্রমাণভিত্তিক হবে।`;
-    case 'official':
-      return `লেখাটি সম্ভবত অফিসিয়াল/দাপ্তরিক চিঠি।
-- আনুষ্ঠানিক, সম্মানজনক ও পরিষ্কার ভাষা ব্যবহার করুন।
-- অতি কথ্য/স্ল্যাং শব্দ এড়িয়ে চলুন।
-- বিনীত কিন্তু দৃঢ় টোন বজায় রাখুন।`;
-    case 'marketing':
-      return `লেখাটি সম্ভবত মার্কেটিং/প্রচারমূলক।
-- প্রভাবশালী, ইতিবাচক ও আকর্ষণীয় শব্দ ব্যবহার করুন।
-- মূল সুবিধা ও প্রভাব স্পষ্ট করে তুলুন।
-- অতি আনুষ্ঠানিকতা কমিয়ে সহজ, প্ররোচনামূলক ভাষা রাখুন।`;
-    case 'social':
-      return `লেখাটি সম্ভবত সোশ্যাল মিডিয়া/অনানুষ্ঠানিক।
-- কথ্য, সহজ ও বন্ধুত্বপূর্ণ ভাষা ব্যবহার করতে পারেন।
-- বেশি বড় ও জটিল বাক্য এড়িয়ে চলুন।
-- পাঠকের সাথে সরাসরি কথা বলার মত টোন রাখুন।`;
-    case 'general':
-    default:
-      return `লেখাটি সাধারণ উদ্দেশ্যের, তাই অত্যধিক আনুষ্ঠানিক বা অতি কথ্য না হয়ে মাঝামাঝি ভারসাম্য বজায় রাখুন।`;
-  }
-};
 
 const buildTonePrompt = (text: string, tone: string) => {
   const toneInstructions: Record<string, string> = {
@@ -124,8 +141,8 @@ const buildTonePrompt = (text: string, tone: string) => {
 📋 **আপনার কাজ:**
 1. টেক্সটের প্রতিটি শব্দ ও বাক্যাংশ বিশ্লেষণ করুন।
 2. কাঙ্ক্ষিত টোনে নেই এমন শব্দগুলো চিহ্নিত করুন।
-3. **গুরুত্বপূর্ণ:** "current" ফিল্ডে শব্দটি হুবহু ইনপুট টেক্সট থেকে কপি করবেন (কোনো পরিবর্তন ছাড়া)।
-4. প্রতিটি সাজেশনের জন্য "position" ফিল্ডে ইনপুট টেক্সটে ওই শব্দ/ফ্রেজের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+3. "position" ফিল্ডে সেই শব্দের 0-based word index দিন; ইনপুট টেক্সটকে স্পেস/নতুন লাইনে ভাগ করে ধারাবাহিকভাবে গুনবেন।
+4. **গুরুত্বপূর্ণ:** "current" ফিল্ডে শব্দটি হুবহু ইনপুট টেক্সট থেকে কপি করবেন (কোনো পরিবর্তন ছাড়া)।
 
 📤 Response Format (ONLY valid JSON, no markdown, no extra text):
 {
@@ -158,7 +175,7 @@ const buildStylePrompt = (text: string, style: string) => {
 ⚠️ **সতর্কতা:**
 - "current" ফিল্ডে শব্দটি টেক্সট থেকে **হুবহু কপি** করবেন।
 - যদি কোন শব্দ পরিবর্তন প্রয়োজন না হয় তবে সেটি বাদ দিন।
-- "position" ফিল্ডে ইনপুট টেক্সটে ওই শব্দের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+- "position" ফিল্ডে সেই শব্দের 0-based word index দিন; ইনপুট টেক্সটকে স্পেস/নতুন লাইনে ভাগ করে ধারাবাহিকভাবে গুনবেন।
 
 📤 Response Format (ONLY valid JSON, no markdown, no extra text):
 {
@@ -175,11 +192,12 @@ const buildStylePrompt = (text: string, style: string) => {
 যদি কোনো পরিবর্তন প্রয়োজন না হয়, তাহলে "styleConversions": [] খালি array রাখবেন।`;
 };
 
-const buildMainPrompt = (text: string, docType: DocumentType) => `
+const buildMainPrompt = (text: string, docType: DocType) => {
+  const docCfg = DOC_TYPE_CONFIG[docType];
+  return `
 আপনি একজন দক্ষ বাংলা প্রুফরিডার।
 
-লেখার ধরন (প্রিসেট): ${DOC_TYPE_LABELS[docType]}
-${getDocTypeInstructions(docType)}
+${docCfg.mainHint}
 
 নিচের টেক্সটটি খুব মনোযোগ দিয়ে বিশ্লেষণ করুন:
 
@@ -187,12 +205,17 @@ ${getDocTypeInstructions(docType)}
 
 ⚠️ কড়া নির্দেশনা:
 
+০. position / index
+   - যেসব অবজেক্টে "position" ফিল্ড আছে, সেখানে:
+   - "position" = এই টেক্সটের ভেতরে ঐ শব্দ/বাক্যাংশের প্রথম শব্দের 0-based word index।
+   - word index নির্ণয়: টেক্সটকে স্পেস, নতুন লাইন ইত্যাদি দিয়ে ভাগ করে ধারাবাহিকভাবে গুনবেন।
+
 ১. বানান ভুল (spellingErrors)
    - শুধু একদম নিশ্চিত ভুল বানান ধরবেন (যেমন যুক্তাক্ষর, ণত্ব-ষত্ব, স্পষ্ট টাইপো)।
    - নাম, ব্র্যান্ড, টেকনিক্যাল টার্ম, ইংরেজি শব্দের বানান পরিবর্তন করবেন না।
    - "wrong" ফিল্ডে ইনপুটের শব্দটি হুবহু কপি করবেন।
    - "suggestions"–এ ১–৩টি বাস্তবসম্মত সঠিক বানান দিন।
-   - "position": ইনপুট টেক্স্টের মধ্যে ওই ভুল শব্দের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+   - "position"–এ ভুল শব্দের প্রথম শব্দের index দিন (অধিকাংশ ক্ষেত্রে এক শব্দই হবে)।
 
 ২. বিরাম চিহ্ন (punctuationIssues)
    - একমাত্র তখনই সমস্যা ধরবেন যখন:
@@ -200,18 +223,18 @@ ${getDocTypeInstructions(docType)}
    - শিরোনাম, তালিকা, কবিতায় দাঁড়ি না থাকলেও সেটিকে ভুল ধরবেন না।
    - "currentSentence" ফিল্ডে ইনপুট বাক্য হুবহু কপি করবেন।
    - "correctedSentence" শুধু যতিচিহ্ন/খুব সামান্য গঠন ঠিক করবে; পুরো বাক্য নতুন করে লিখবেন না।
-   - "position": ইনপুট টেক্সটে ওই বাক্যের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+   - "position"–এ ঐ বাক্যের প্রথম শব্দের index দিন।
 
 ৩. ভাষারীতি মিশ্রণ (languageStyleMixing)
    - সাধু ও চলিত রীতি একসাথে ব্যবহৃত হলে তবেই detected = true করুন।
    - খুব বেশি পরিবর্তন না করে, একই ধরণের শব্দে সামঞ্জস্য আনার সাজেশন দিবেন।
    - "current" ফিল্ডে ইনপুটের অংশ হুবহু কপি করবেন।
-   - প্রতিটি correction-এর জন্য "position": ইনপুট টেক্সটে ওই অংশের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+   - প্রতিটি correction অবজেক্টে "position" দিন।
 
 ৪. শ্রুতিমধুরতা (euphonyImprovements)
    - কেবল তখনই সাজেশন দেবেন যখন কোনো শব্দ/বাক্যাংশ সত্যিই কানে বিরক্তিকর বা অতিরিক্ত ভারী শোনায়।
    - অর্থের বড় পরিবর্তন করবেন না, শুধু সামান্য শব্দ বাছাই ভালো করবেন।
-   - "position": ইনপুট টেক্সটে ওই অংশের শুরুর ক্যারেক্টার ইনডেক্স (০ ভিত্তিক) দিন।
+   - "position"–এ বাক্যাংশের প্রথম শব্দের index দিন।
 
 📤 আউটপুট ফরম্যাট (ONLY valid JSON, কোনো markdown code block, ব্যাখ্যা বা অতিরিক্ত টেক্সট নয়):
 
@@ -232,7 +255,7 @@ ${getDocTypeInstructions(docType)}
         "current": "শব্দ",
         "suggestion": "সংশোধন",
         "type": "সাধু→চলিত",
-        "position": 0
+        "position": 10
       }
     ]
   },
@@ -242,7 +265,7 @@ ${getDocTypeInstructions(docType)}
       "currentSentence": "ইনপুট বাক্য",
       "correctedSentence": "সংশোধিত বাক্য",
       "explanation": "ব্যাখ্যা",
-      "position": 0
+      "position": 50
     }
   ],
   "euphonyImprovements": [
@@ -250,79 +273,56 @@ ${getDocTypeInstructions(docType)}
       "current": "শব্দ/বাক্যাংশ",
       "suggestions": ["বিকল্প"],
       "reason": "কেন এটি ভালো",
-      "position": 0
+      "position": 120
     }
   ]
 }
 `;
-
-/* -------------------------------------------------------------------------- */
-/*                        TEXT CHUNKING HELPERS                               */
-/* -------------------------------------------------------------------------- */
-
-interface TextChunk {
-  text: string;
-  start: number; // start index in analysisText
-}
-
-const CHUNK_SIZE = 2000;
-
-const splitIntoChunks = (text: string, chunkSize = CHUNK_SIZE): TextChunk[] => {
-  const chunks: TextChunk[] = [];
-  const len = text.length;
-  let offset = 0;
-
-  while (offset < len) {
-    let end = Math.min(offset + chunkSize, len);
-
-    if (end < len) {
-      // কাছাকাছি কোনো newline বা দাড়ি থাকলে সেখানে কেটে দাও
-      const newlineIndex = text.lastIndexOf('\n', end);
-      const dandaIndex = text.lastIndexOf('।', end);
-      const breakIndex = Math.max(newlineIndex, dandaIndex);
-      if (breakIndex > offset + chunkSize * 0.5) {
-        end = breakIndex + 1;
-      }
-    }
-
-    const chunkText = text.slice(offset, end);
-    chunks.push({ text: chunkText, start: offset });
-    offset = end;
-  }
-
-  return chunks;
 };
 
 /* -------------------------------------------------------------------------- */
 /*                           MAIN COMPONENT                                   */
 /* -------------------------------------------------------------------------- */
 
+type SectionKey =
+  | 'spelling'
+  | 'tone'
+  | 'style'
+  | 'mixing'
+  | 'punctuation'
+  | 'euphony'
+  | 'content';
+
+type ViewFilter = 'all' | 'spelling' | 'punctuation';
+
 function App() {
   // Settings State
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.0-flash');
-  const [docType, setDocType] = useState<DocumentType>(
-    (localStorage.getItem('doc_type') as DocumentType) || 'general'
+  const [docType, setDocType] = useState<DocType>(
+    (localStorage.getItem('doc_type') as DocType) || 'generic'
   );
   
   // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [activeModal, setActiveModal] = useState<'none' | 'settings' | 'instructions' | 'tone' | 'style'>('none');
-  
-  // Selection / Filter / Collapse
-  const [selectedTone, setSelectedTone] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState<'none' | 'sadhu' | 'cholito'>('none');
+  const [activeModal, setActiveModal] = useState<'none' | 'settings' | 'instructions' | 'tone' | 'style' | 'doctype'>('none');
+
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
-  const [collapsed, setCollapsed] = useState({
+  const [collapsedSections, setCollapsedSections] = useState<Record<SectionKey, boolean>>({
     spelling: false,
     tone: false,
     style: false,
     mixing: false,
     punctuation: false,
-    euphony: false
+    euphony: false,
+    content: false
   });
+  
+  // Selection State
+  const [selectedTone, setSelectedTone] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState<'none' | 'sadhu' | 'cholito'>('none');
 
   // Data State
   const [corrections, setCorrections] = useState<Correction[]>([]);
@@ -334,7 +334,6 @@ function App() {
   const [contentAnalysis, setContentAnalysis] = useState<ContentAnalysis | null>(null);
   
   const [stats, setStats] = useState({ totalWords: 0, errorCount: 0, accuracy: 100 });
-  const [documentText, setDocumentText] = useState<string>(''); // full document text (for position mapping)
 
   useEffect(() => {
     // Initialize logic if needed
@@ -343,7 +342,7 @@ function App() {
   /* --- HELPERS --- */
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3500);
+    setTimeout(() => setMessage(null), 4000);
   };
 
   const saveSettings = () => {
@@ -354,67 +353,58 @@ function App() {
     setActiveModal('none');
   };
 
+  const toggleSection = (key: SectionKey) => {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   // Normalizes text for comparison
   const normalize = (str: string) => {
     if (!str) return '';
     return str.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
   };
 
-  // position থেকে কত নম্বর occurrence, তা বের করা
-  const getOccurrenceIndex = (full: string, target: string, position: number): number => {
-    if (!full || !target || position == null || position < 0) return 0;
-    let count = 0;
-    let idx = full.indexOf(target);
-    while (idx !== -1 && idx < position) {
-      count++;
-      idx = full.indexOf(target, idx + target.length);
+  // Chunking helper
+  const chunkText = (text: string, maxChars = 2500): string[] => {
+    const chunks: string[] = [];
+    let start = 0;
+    const len = text.length;
+    while (start < len) {
+      let end = Math.min(len, start + maxChars);
+      if (end < len) {
+        const lastNewline = text.lastIndexOf('\n', end);
+        if (lastNewline > start + 200) {
+          end = lastNewline;
+        }
+      }
+      chunks.push(text.slice(start, end));
+      start = end;
     }
-    return count;
-  };
-
-  const toggleSection = (key: keyof typeof collapsed) => {
-    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+    return chunks;
   };
 
   /* --- WORD API INTERACTION --- */
-
-  interface TextInfo {
-    analysisText: string;  // selection or full
-    fullText: string;      // always full document text
-    analysisOffset: number; // analysisText শুরু হয়েছে fullText-এর কোথায়
-  }
-
-  const getTextInfoFromWord = async (): Promise<TextInfo | null> => {
+  const getTextFromWord = async (): Promise<string> => {
     return new Promise((resolve) => {
       Word.run(async (context) => {
         const selection = context.document.getSelection();
-        const body = context.document.body;
         selection.load(['text', 'isEmpty']);
-        body.load('text');
         await context.sync();
 
-        const rawFull = body.text || '';
-        const rawSel = selection.text || '';
-
-        const full = rawFull.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const sel = rawSel.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-        let analysisText: string;
-        let analysisOffset = 0;
-
-        if (!selection.isEmpty && sel.trim().length > 0) {
-          analysisText = sel;
-          const idx = full.indexOf(sel);
-          analysisOffset = idx >= 0 ? idx : 0;
+        let targetText = '';
+        if (!selection.isEmpty && selection.text.trim().length > 0) {
+          targetText = selection.text;
         } else {
-          analysisText = full;
-          analysisOffset = 0;
+          const body = context.document.body;
+          body.load('text');
+          await context.sync();
+          targetText = body.text;
         }
-
-        resolve({ analysisText, fullText: full, analysisOffset });
+        
+        const cleanText = targetText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        resolve(cleanText);
       }).catch((error) => {
         console.error('Error reading Word:', error);
-        resolve(null);
+        resolve('');
       });
     });
   };
@@ -426,27 +416,35 @@ function App() {
     const hasSpace = /\s/.test(cleanText);
 
     await Word.run(async (context) => {
-      const results = context.document.body.search(cleanText, { 
-        matchCase: false,
-        matchWholeWord: !hasSpace, // এক শব্দ হলে whole word
-        ignoreSpace: true 
-      });
-      results.load(['items', 'items/font', 'items/text']);
-      await context.sync();
+      const body = context.document.body;
 
-      if (results.items.length === 0) return;
+      // যদি position আছে এবং multi-word না হয়, তাহলে word index ব্যবহার
+      if (typeof position === 'number' && position >= 0 && !hasSpace) {
+        const whole = body.getRange("Whole");
+        const words = whole.getTextRanges([" ", "\r", "\n", "\t"], true);
+        words.load("items");
+        await context.sync();
 
-      if (position == null || !documentText) {
-        // position নাই, সবগুলো হাইলাইট
-        for (let i = 0; i < results.items.length; i++) {
-          results.items[i].font.highlightColor = color;
+        if (position < words.items.length) {
+          const targetRange = words.items[position];
+          targetRange.font.highlightColor = color;
+          await context.sync();
+          return;
         }
-      } else {
-        const occurrenceIndex = getOccurrenceIndex(documentText, cleanText, position);
-        const idx = Math.min(occurrenceIndex, results.items.length - 1);
-        results.items[idx].font.highlightColor = color;
       }
 
+      // fallback: search ভিত্তিক highlight
+      const results = body.search(cleanText, { 
+        matchCase: false,
+        matchWholeWord: !hasSpace,
+        ignoreSpace: true 
+      });
+      results.load('font');
+      await context.sync();
+      
+      for (let i = 0; i < results.items.length; i++) {
+        results.items[i].font.highlightColor = color;
+      }
       await context.sync();
     }).catch(console.error);
   };
@@ -459,7 +457,27 @@ function App() {
     let success = false;
 
     await Word.run(async (context) => {
-      const results = context.document.body.search(cleanOldText, { 
+      const body = context.document.body;
+
+      if (typeof position === 'number' && position >= 0 && !hasSpace) {
+        // word index ভিত্তিক replace (একটি শব্দ)
+        const whole = body.getRange("Whole");
+        const words = whole.getTextRanges([" ", "\r", "\n", "\t"], true);
+        words.load("items");
+        await context.sync();
+
+        if (position < words.items.length) {
+          const target = words.items[position];
+          target.insertText(newText, Word.InsertLocation.replace);
+          target.font.highlightColor = "None";
+          await context.sync();
+          success = true;
+          return;
+        }
+      }
+
+      // fallback: search ভিত্তিক replace
+      const results = body.search(cleanOldText, { 
         matchCase: false,
         matchWholeWord: !hasSpace,
         ignoreSpace: true 
@@ -467,24 +485,14 @@ function App() {
       results.load('items');
       await context.sync();
 
-      if (results.items.length === 0) return;
-
-      if (position == null || !documentText) {
-        // সব occurrence রিপ্লেস
+      if (results.items.length > 0) {
         results.items.forEach((item) => {
           item.insertText(newText, Word.InsertLocation.replace);
           item.font.highlightColor = "None";
         });
-      } else {
-        const occurrenceIndex = getOccurrenceIndex(documentText, cleanOldText, position);
-        const idx = Math.min(occurrenceIndex, results.items.length - 1);
-        const item = results.items[idx];
-        item.insertText(newText, Word.InsertLocation.replace);
-        item.font.highlightColor = "None";
+        await context.sync();
+        success = true;
       }
-
-      await context.sync();
-      success = true;
     }).catch(console.error);
 
     if (success) {
@@ -546,15 +554,17 @@ function App() {
     }).catch(console.error);
   };
 
-  /* --- GEMINI JSON HELPER --- */
+  /* --- GEMINI JSON HELPER (with detailed error handling) --- */
   const callGeminiJson = async (
     prompt: string,
     { temperature = 0.2 }: { temperature?: number } = {}
   ): Promise<any | null> => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
 
+    let response: Response;
+
     try {
-      const response = await fetch(url, {
+      response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -565,305 +575,58 @@ function App() {
           }
         })
       });
-
-      if (!response.ok) {
-        let userMessage = 'অজানা ত্রুটি ঘটেছে। পরে আবার চেষ্টা করুন।';
-        if (response.status === 401 || response.status === 403) {
-          userMessage = 'API Key বা অনুমতি সংক্রান্ত সমস্যা। সেটিংসে আপনার Key যাচাই করুন।';
-        } else if (response.status === 429) {
-          userMessage = 'Rate limit অতিক্রম করেছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
-        } else if (response.status >= 500) {
-          userMessage = 'সার্ভার-সাইড সমস্যা (5xx)। কিছুক্ষণ পর আবার চেষ্টা করুন।';
-        }
-
-        const err: any = new Error(userMessage);
-        err.status = response.status;
-        err.statusText = response.statusText;
-        try {
-          err.body = await response.text();
-        } catch {
-          // ignore
-        }
-        throw err;
-      }
-
-      const data = await response.json();
-
-      const parts = data?.candidates?.[0]?.content?.parts;
-      if (!Array.isArray(parts)) return null;
-
-      const raw = parts.map((p: any) => p.text ?? '').join('').trim();
-      if (!raw) return null;
-
-      try {
-        return JSON.parse(raw);
-      } catch {
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (match) {
-          try {
-            return JSON.parse(match[0]);
-          } catch {
-            return null;
-          }
-        }
-        return null;
-      }
     } catch (err: any) {
-      if (err?.name === 'TypeError') {
-        throw new Error('ইন্টারনেট সংযোগ বা নেটওয়ার্ক সমস্যার কারণে অনুরোধ সম্পন্ন হয়নি।');
-      }
-      throw err;
-    }
-  };
-
-  /* --- MAIN CHECK (CHUNKED) --- */
-
-  interface MainCheckChunkResult {
-    spellingErrors: Correction[];
-    mixing: StyleMixing | null;
-    punctuation: PunctuationIssue[];
-    euphony: EuphonyImprovement[];
-  }
-
-  const performMainCheckOnChunk = async (
-    chunk: TextChunk,
-    baseOffset: number
-  ): Promise<MainCheckChunkResult> => {
-    const result = await callGeminiJson(buildMainPrompt(chunk.text, docType), { temperature: 0.1 });
-    if (!result) throw new Error('Gemini থেকে ফলাফল পাওয়া যায়নি।');
-
-    const chunkBase = baseOffset + chunk.start;
-
-    const spellingErrors: Correction[] = (result.spellingErrors || []).map((err: any) => {
-      let localPos: number =
-        typeof err.position === 'number'
-          ? err.position
-          : chunk.text.indexOf(err.wrong);
-      if (localPos < 0) localPos = 0;
-      const globalPos = chunkBase + localPos;
-      return {
-        wrong: err.wrong,
-        suggestions: err.suggestions || [],
-        position: globalPos
-      };
-    });
-
-    const punctuation: PunctuationIssue[] = (result.punctuationIssues || []).map((p: any) => {
-      let localPos: number =
-        typeof p.position === 'number'
-          ? p.position
-          : chunk.text.indexOf(p.currentSentence);
-      if (localPos < 0) localPos = 0;
-      const globalPos = chunkBase + localPos;
-      return {
-        issue: p.issue,
-        currentSentence: p.currentSentence,
-        correctedSentence: p.correctedSentence,
-        explanation: p.explanation,
-        position: globalPos
-      };
-    });
-
-    const euphony: EuphonyImprovement[] = (result.euphonyImprovements || []).map((e: any) => {
-      let localPos: number =
-        typeof e.position === 'number'
-          ? e.position
-          : chunk.text.indexOf(e.current);
-      if (localPos < 0) localPos = 0;
-      const globalPos = chunkBase + localPos;
-      return {
-        current: e.current,
-        suggestions: e.suggestions || [],
-        reason: e.reason,
-        position: globalPos
-      };
-    });
-
-    let mixing: StyleMixing | null = null;
-    if (result.languageStyleMixing) {
-      const m = result.languageStyleMixing;
-      let corrections: StyleMixing['corrections'] = undefined;
-
-      if (Array.isArray(m.corrections)) {
-        corrections = m.corrections.map((c: any) => {
-          let localPos: number =
-            typeof c.position === 'number'
-              ? c.position
-              : chunk.text.indexOf(c.current);
-          if (localPos < 0) localPos = 0;
-          const globalPos = chunkBase + localPos;
-          return {
-            current: c.current,
-            suggestion: c.suggestion,
-            type: c.type,
-            position: globalPos
-          };
-        });
-      }
-
-      mixing = {
-        detected: !!m.detected,
-        recommendedStyle: m.recommendedStyle,
-        reason: m.reason,
-        corrections
-      };
+      console.error('Network error:', err);
+      throw new Error('ইন্টারনেট সংযোগে সমস্যা হয়েছে। দয়া করে নেটওয়ার্ক চেক করে আবার চেষ্টা করুন।');
     }
 
-    return { spellingErrors, mixing, punctuation, euphony };
-  };
+    if (!response.ok) {
+      const status = response.status;
+      let userMessage = '';
 
-  const runMainCheckOverChunks = async (analysisText: string, baseOffset: number) => {
-    const chunks = splitIntoChunks(analysisText);
-    const allCorrections: Correction[] = [];
-    const allPunct: PunctuationIssue[] = [];
-    const allEuphony: EuphonyImprovement[] = [];
-    let mixingAggregate: StyleMixing | null = null;
+      if (status === 401 || status === 403) {
+        userMessage = 'API Key বা অনুমতি (permission) সংক্রান্ত সমস্যা হয়েছে। Key সঠিক কিনা এবং প্রয়োজনীয় access আছে কিনা চেক করুন।';
+      } else if (status === 429) {
+        userMessage = 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+      } else if (status >= 500) {
+        userMessage = 'Gemini সার্ভারে সাময়িক সমস্যা হচ্ছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
+      } else if (status === 400) {
+        userMessage = 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
+      } else {
+        userMessage = `Gemini সার্ভার থেকে ত্রুটি (স্ট্যাটাস: ${status})।`;
+      }
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      setLoadingText(`বানান ও ব্যাকরণ দেখা হচ্ছে... (${i + 1}/${chunks.length})`);
-      const { spellingErrors, mixing, punctuation, euphony } =
-        await performMainCheckOnChunk(chunk, baseOffset);
+      const bodyText = await response.text().catch(() => '');
+      console.error('Gemini API error:', status, bodyText);
+      throw new Error(userMessage);
+    }
 
-      allCorrections.push(...spellingErrors);
-      allPunct.push(...punctuation);
-      allEuphony.push(...euphony);
+    const data = await response.json();
 
-      if (mixing?.detected) {
-        if (!mixingAggregate) {
-          mixingAggregate = { ...mixing, corrections: mixing.corrections || [] };
-        } else {
-          mixingAggregate.detected = true;
-          if (!mixingAggregate.corrections) mixingAggregate.corrections = [];
-          if (mixing.corrections) {
-            mixingAggregate.corrections.push(...mixing.corrections);
-          }
-          // recommendedStyle ভিন্ন হলে এখন আপাতত প্রথমটাকেই রেখে দিচ্ছি
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return null;
+
+    const raw = parts.map((p: any) => p.text ?? '').join('').trim();
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (e) {
+          console.error('JSON parse error (inner):', e, match[0]);
+          return null;
         }
       }
-    }
-
-    // ডকুমেন্টে যে ক্রমে আছে সেই ক্রমে sort
-    allCorrections.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    allPunct.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    allEuphony.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-
-    if (mixingAggregate?.corrections) {
-      mixingAggregate.corrections.sort(
-        (a, b) => (a.position ?? 0) - (b.position ?? 0)
-      );
-    }
-
-    setCorrections(allCorrections);
-    setPunctuationIssues(allPunct);
-    setEuphonyImprovements(allEuphony);
-    setLanguageStyleMixing(mixingAggregate);
-
-    const words = analysisText.trim().split(/\s+/).filter(Boolean).length;
-    const errors = allCorrections.length;
-    setStats({
-      totalWords: words,
-      errorCount: errors,
-      accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
-    });
-
-    // বানান ভুল হাইলাইট (position-aware)
-    for (const err of allCorrections) {
-      await highlightInWord(err.wrong, '#fee2e2', err.position);
+      console.error('JSON parse error (outer): raw =', raw);
+      return null;
     }
   };
 
-  /* --- OTHER CHECKS --- */
-
-  const performToneCheck = async (text: string, baseOffset: number) => {
-    const prompt = buildTonePrompt(text, selectedTone);
-    const result = await callGeminiJson(
-      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "toneConversions": [] খালি array রাখবেন।`,
-      { temperature: 0.2 }
-    );
-    if (!result) return;
-
-    const toneConversions: ToneSuggestion[] = (result.toneConversions || []).map((t: any) => {
-      let localPos: number =
-        typeof t.position === 'number'
-          ? t.position
-          : text.indexOf(t.current);
-      if (localPos < 0) localPos = 0;
-      const globalPos = baseOffset + localPos;
-      return {
-        current: t.current,
-        suggestion: t.suggestion,
-        reason: t.reason,
-        position: globalPos
-      };
-    });
-
-    toneConversions.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    setToneSuggestions(toneConversions);
-
-    for (const t of toneConversions) {
-      await highlightInWord(t.current, '#fef3c7', t.position);
-    }
-  };
-
-  const performStyleCheck = async (text: string, baseOffset: number) => {
-    const prompt = buildStylePrompt(text, selectedStyle);
-    const result = await callGeminiJson(
-      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "styleConversions": [] খালি array রাখবেন।`,
-      { temperature: 0.2 }
-    );
-    if (!result) return;
-
-    const styleConversions: StyleSuggestion[] = (result.styleConversions || []).map((s: any) => {
-      let localPos: number =
-        typeof s.position === 'number'
-          ? s.position
-          : text.indexOf(s.current);
-      if (localPos < 0) localPos = 0;
-      const globalPos = baseOffset + localPos;
-      return {
-        current: s.current,
-        suggestion: s.suggestion,
-        type: s.type,
-        position: globalPos
-      };
-    });
-
-    styleConversions.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    setStyleSuggestions(styleConversions);
-
-    for (const s of styleConversions) {
-      await highlightInWord(s.current, '#ccfbf1', s.position);
-    }
-  };
-
-  const analyzeContent = async (text: string, docType: DocumentType) => {
-    const prompt = `
-বাংলা লেখাটি খুব সংক্ষেপে বিশ্লেষণ করুন।
-
-প্রিসেট ডকুমেন্ট টাইপ (হিন্ট): ${DOC_TYPE_LABELS[docType]}
-যদি আপনার বিশ্লেষণ অনুযায়ী ধরন ভিন্ন মনে হয়, "contentType" ফিল্ডে তা সংক্ষেপে উল্লেখ করুন।
-
-লেখা:
-"""${text}"""
-
-Response format (ONLY valid JSON, no extra text):
-
-{
-  "contentType": "লেখার ধরন (১-২ শব্দ)",
-  "description": "খুব সংক্ষিপ্ত বর্ণনা (১ লাইন)",
-  "missingElements": ["গুরুত্বপূর্ণ ১-২টি জিনিস যা নেই"],
-  "suggestions": ["১টি প্রধান পরামর্শ"]
-}
-`;
-    const result = await callGeminiJson(prompt, { temperature: 0.5 });
-    if (!result) return;
-
-    setContentAnalysis(result as ContentAnalysis);
-  };
-
-  /* --- MAIN ENTRY: CHECK SPELLING --- */
-
+  /* --- API LOGIC --- */
   const checkSpelling = async () => {
     if (!apiKey) {
       showMessage('অনুগ্রহ করে প্রথমে API Key দিন', 'error');
@@ -871,14 +634,11 @@ Response format (ONLY valid JSON, no extra text):
       return;
     }
 
-    const info = await getTextInfoFromWord();
-    if (!info || !info.analysisText || info.analysisText.trim().length === 0) {
+    const text = await getTextFromWord();
+    if (!text || text.trim().length === 0) {
       showMessage('টেক্সট নির্বাচন করুন বা কার্সার রাখুন', 'error');
       return;
     }
-
-    const { analysisText, fullText, analysisOffset } = info;
-    setDocumentText(fullText);
 
     setIsLoading(true);
     setLoadingText('বিশ্লেষণ করা হচ্ছে...');
@@ -895,27 +655,28 @@ Response format (ONLY valid JSON, no extra text):
     await clearHighlights();
 
     try {
-      await runMainCheckOverChunks(analysisText, analysisOffset);
+      setLoadingText('বানান ও ব্যাকরণ দেখা হচ্ছে...');
+      await performMainCheck(text);
 
       const extraTasks: Promise<void>[] = [];
 
       if (selectedTone) {
         extraTasks.push((async () => {
           setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
-          await performToneCheck(analysisText, analysisOffset);
+          await performToneCheck(text);
         })());
       }
 
       if (selectedStyle !== 'none') {
         extraTasks.push((async () => {
           setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
-          await performStyleCheck(analysisText, analysisOffset);
+          await performStyleCheck(text);
         })());
       }
 
       extraTasks.push((async () => {
         setLoadingText('সারাংশ তৈরি হচ্ছে...');
-        await analyzeContent(analysisText, docType);
+        await analyzeContent(text);
       })());
 
       await Promise.all(extraTasks);
@@ -931,6 +692,163 @@ Response format (ONLY valid JSON, no extra text):
     }
   };
 
+  // MAIN CHECK with chunking & position merging
+  const performMainCheck = async (text: string) => {
+    const chunks = chunkText(text, 2500);
+
+    const allSpelling: Correction[] = [];
+    const allPunct: PunctuationIssue[] = [];
+    const allEuphony: EuphonyImprovement[] = [];
+    let globalMixing: StyleMixing | null = null;
+    const globalMixCorrections: StyleMixingCorrection[] = [];
+
+    let baseWordOffset = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const chunkPrompt = buildMainPrompt(chunk, docType);
+
+      const result = await callGeminiJson(chunkPrompt, { temperature: 0.1 });
+      if (!result) continue;
+
+      const spellingErrors: Correction[] = (result.spellingErrors || []).map((e: any) => ({
+        ...e,
+        position: typeof e.position === 'number' ? e.position + baseWordOffset : undefined
+      }));
+
+      const punctIssues: PunctuationIssue[] = (result.punctuationIssues || []).map((p: any) => ({
+        ...p,
+        position: typeof p.position === 'number' ? p.position + baseWordOffset : undefined
+      }));
+
+      const euphony: EuphonyImprovement[] = (result.euphonyImprovements || []).map((e: any) => ({
+        ...e,
+        position: typeof e.position === 'number' ? e.position + baseWordOffset : undefined
+      }));
+
+      const mixing: StyleMixing | null = result.languageStyleMixing || null;
+      if (mixing?.detected) {
+        if (!globalMixing) {
+          globalMixing = {
+            detected: true,
+            recommendedStyle: mixing.recommendedStyle,
+            reason: mixing.reason,
+            corrections: []
+          };
+        }
+        const corr: StyleMixingCorrection[] = (mixing.corrections || []).map((c: any) => ({
+          ...c,
+          position: typeof c.position === 'number' ? c.position + baseWordOffset : undefined
+        }));
+        globalMixCorrections.push(...corr);
+      }
+
+      allSpelling.push(...spellingErrors);
+      allPunct.push(...punctIssues);
+      allEuphony.push(...euphony);
+
+      const chunkWords = chunk.trim().length > 0 ? chunk.trim().split(/\s+/).filter(Boolean).length : 0;
+      baseWordOffset += chunkWords;
+    }
+
+    // sort by position
+    allSpelling.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    allPunct.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    allEuphony.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    if (globalMixing) {
+      globalMixing.corrections = (globalMixCorrections || []).sort(
+        (a, b) => (a.position ?? 0) - (b.position ?? 0)
+      );
+    }
+
+    setCorrections(allSpelling);
+    setPunctuationIssues(allPunct);
+    setEuphonyImprovements(allEuphony);
+    setLanguageStyleMixing(globalMixing);
+
+    const words = text.trim().length > 0 ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+    const errors = allSpelling.length;
+
+    setStats({
+      totalWords: words,
+      errorCount: errors,
+      accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
+    });
+
+    // Highlight spelling errors
+    for (const err of allSpelling) {
+      await highlightInWord(err.wrong, '#fee2e2', err.position);
+    }
+  };
+
+  const performToneCheck = async (text: string) => {
+    const prompt = buildTonePrompt(text, selectedTone);
+    const result = await callGeminiJson(
+      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "toneConversions": [] খালি array রাখবেন।`,
+      { temperature: 0.2 }
+    );
+    if (!result) return;
+
+    const toneConversions: ToneSuggestion[] = (result.toneConversions || []).map((t: any) => ({
+      ...t,
+      position: typeof t.position === 'number' ? t.position : undefined
+    }));
+
+    toneConversions.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    setToneSuggestions(toneConversions);
+
+    for (const t of toneConversions) {
+      await highlightInWord(t.current, '#fef3c7', t.position);
+    }
+  };
+
+  const performStyleCheck = async (text: string) => {
+    const prompt = buildStylePrompt(text, selectedStyle);
+    const result = await callGeminiJson(
+      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "styleConversions": [] খালি array রাখবেন।`,
+      { temperature: 0.2 }
+    );
+    if (!result) return;
+
+    const styleConversions: StyleSuggestion[] = (result.styleConversions || []).map((s: any) => ({
+      ...s,
+      position: typeof s.position === 'number' ? s.position : undefined
+    }));
+
+    styleConversions.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    setStyleSuggestions(styleConversions);
+
+    for (const s of styleConversions) {
+      await highlightInWord(s.current, '#ccfbf1', s.position);
+    }
+  };
+
+  const analyzeContent = async (text: string) => {
+    const cfg = DOC_TYPE_CONFIG[docType];
+    const prompt = `
+বাংলা লেখাটি খুব সংক্ষেপে বিশ্লেষণ করুন।
+
+ধরুন এটি: ${cfg.label}
+
+${cfg.contentHint}
+
+"""${text}"""
+
+Response format (ONLY valid JSON, no extra text):
+
+{
+  "contentType": "লেখার ধরন (১-২ শব্দ)",
+  "description": "খুব সংক্ষিপ্ত বর্ণনা (১ লাইন)",
+  "missingElements": ["গুরুত্বপূর্ণ ১-২টি জিনিস যা নেই"],
+  "suggestions": ["১টি প্রধান পরামর্শ"]
+}
+`;
+    const result = await callGeminiJson(prompt, { temperature: 0.4 });
+    if (!result) return;
+
+    setContentAnalysis(result as ContentAnalysis);
+  };
+
   /* --- RENDER HELPERS --- */
   const getToneName = (t: string) => {
     const map: Record<string, string> = {
@@ -939,6 +857,13 @@ Response format (ONLY valid JSON, no extra text):
       'neutral': '⚖️ নিরপেক্ষ', 'academic': '📚 শিক্ষামূলক'
     };
     return map[t] || t;
+  };
+
+  const shouldShowSection = (key: SectionKey): boolean => {
+    if (viewFilter === 'all') return true;
+    if (viewFilter === 'spelling') return key === 'spelling';
+    if (viewFilter === 'punctuation') return key === 'punctuation';
+    return true;
   };
 
   /* --- UI RENDER --- */
@@ -956,17 +881,60 @@ Response format (ONLY valid JSON, no extra text):
         </div>
 
         <div className="toolbar">
-          <button className={`icon-btn ${selectedTone ? 'active' : ''}`} onClick={() => setActiveModal('tone')} title="টোন/ভাব নির্বাচন">
+          <button
+            className={`icon-btn ${selectedTone ? 'active' : ''}`}
+            onClick={() => setActiveModal('tone')}
+            title="টোন/ভাব নির্বাচন"
+          >
             <span className="icon">🗣️</span>
             <span className="label">টোন</span>
             {selectedTone && <span className="badge">✓</span>}
           </button>
-          <button className={`icon-btn ${selectedStyle !== 'none' ? 'active' : ''}`} onClick={() => setActiveModal('style')} title="ভাষারীতি নির্বাচন">
+
+          <button
+            className={`icon-btn ${selectedStyle !== 'none' ? 'active' : ''}`}
+            onClick={() => setActiveModal('style')}
+            title="ভাষারীতি নির্বাচন"
+          >
              <span className="icon">📝</span>
             <span className="label">ভাষারীতি</span>
             {selectedStyle !== 'none' && <span className="badge">✓</span>}
           </button>
+
+          <button
+            className={`icon-btn ${docType !== 'generic' ? 'active' : ''}`}
+            onClick={() => setActiveModal('doctype')}
+            title="ডকুমেন্ট টাইপ নির্বাচন"
+          >
+            <span className="icon">📂</span>
+            <span className="label">ডক টাইপ</span>
+            {docType !== 'generic' && <span className="badge">✓</span>}
+          </button>
+
           <div style={{flex: 1}}></div>
+
+          {/* Filter */}
+          <div className="view-filter">
+            <button
+              className={viewFilter === 'all' ? 'active' : ''}
+              onClick={() => setViewFilter('all')}
+            >
+              সব
+            </button>
+            <button
+              className={viewFilter === 'spelling' ? 'active' : ''}
+              onClick={() => setViewFilter('spelling')}
+            >
+              শুধু বানান
+            </button>
+            <button
+              className={viewFilter === 'punctuation' ? 'active' : ''}
+              onClick={() => setViewFilter('punctuation')}
+            >
+              শুধু বিরামচিহ্ন
+            </button>
+          </div>
+
           <button 
             onClick={checkSpelling} 
             disabled={isLoading}
@@ -978,7 +946,7 @@ Response format (ONLY valid JSON, no extra text):
       </div>
 
       {/* Selection Display */}
-      {(selectedTone || selectedStyle !== 'none') && (
+      {(selectedTone || selectedStyle !== 'none' || docType !== 'generic') && (
         <div className="selection-display">
           {selectedTone && (
              <span className="selection-tag tone-tag">
@@ -992,9 +960,12 @@ Response format (ONLY valid JSON, no extra text):
                <button onClick={() => setSelectedStyle('none')} className="clear-btn">✕</button>
              </span>
           )}
-          <span className="selection-tag" style={{background:'#e5e7eb', color:'#111827'}}>
-            📄 {DOC_TYPE_LABELS[docType]}
-          </span>
+          {docType && (
+            <span className="selection-tag doc-type-tag">
+              📂 {getDocTypeLabel(docType)}
+              <button onClick={() => setDocType('generic')} className="clear-btn">✕</button>
+            </span>
+          )}
         </div>
       )}
 
@@ -1025,85 +996,71 @@ Response format (ONLY valid JSON, no extra text):
 
         {/* Stats */}
         {stats.totalWords > 0 && (
-          <>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="val" style={{color: '#667eea'}}>{stats.totalWords}</div>
-                <div className="lbl">শব্দ</div>
-              </div>
-              <div className="stat-card">
-                <div className="val" style={{color: '#dc2626'}}>{stats.errorCount}</div>
-                <div className="lbl">ভুল</div>
-              </div>
-              <div className="stat-card">
-                <div className="val" style={{color: '#16a34a'}}>{stats.accuracy}%</div>
-                <div className="lbl">শুদ্ধতা</div>
-              </div>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="val" style={{color: '#667eea'}}>{stats.totalWords}</div>
+              <div className="lbl">শব্দ</div>
             </div>
-
-            {/* Filter Bar */}
-            <div className="filter-bar">
-              <button
-                className={`filter-btn ${viewFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setViewFilter('all')}
-              >
-                সব দেখাও
-              </button>
-              <button
-                className={`filter-btn ${viewFilter === 'spelling' ? 'active' : ''}`}
-                onClick={() => setViewFilter('spelling')}
-              >
-                শুধু বানান
-              </button>
-              <button
-                className={`filter-btn ${viewFilter === 'punctuation' ? 'active' : ''}`}
-                onClick={() => setViewFilter('punctuation')}
-              >
-                শুধু বিরামচিহ্ন
-              </button>
+            <div className="stat-card">
+              <div className="val" style={{color: '#dc2626'}}>{stats.errorCount}</div>
+              <div className="lbl">ভুল</div>
             </div>
-          </>
+            <div className="stat-card">
+              <div className="val" style={{color: '#16a34a'}}>{stats.accuracy}%</div>
+              <div className="lbl">শুদ্ধতা</div>
+            </div>
+          </div>
         )}
 
         {/* Content Analysis */}
-        {contentAnalysis && viewFilter === 'all' && (
+        {contentAnalysis && shouldShowSection('content') && (
           <>
-            <div className="analysis-card content-analysis">
-              <h3>📋 {contentAnalysis.contentType}</h3>
-              {contentAnalysis.description && <p>{contentAnalysis.description}</p>}
+            <div className="section-header">
+              <h3>📋 কনটেন্ট বিশ্লেষণ</h3>
+              <button
+                className="collapse-btn"
+                onClick={() => toggleSection('content')}
+              >
+                {collapsedSections.content ? '➕' : '➖'}
+              </button>
             </div>
-            {contentAnalysis.missingElements && contentAnalysis.missingElements.length > 0 && (
-              <div className="analysis-card missing-analysis">
-                <h3 style={{color:'#78350f'}}>⚠️ যা যোগ করুন</h3>
-                <ul>{contentAnalysis.missingElements.map((e, i) => <li key={i}>{e}</li>)}</ul>
-              </div>
-            )}
-             {contentAnalysis.suggestions && contentAnalysis.suggestions.length > 0 && (
-              <div className="analysis-card suggestion-analysis">
-                <h3 style={{color:'#115e59'}}>✨ পরামর্শ</h3>
-                <ul>{contentAnalysis.suggestions.map((e, i) => <li key={i}>{e}</li>)}</ul>
-              </div>
+            {!collapsedSections.content && (
+              <>
+                <div className="analysis-card content-analysis">
+                  <h3>📋 {contentAnalysis.contentType}</h3>
+                  {contentAnalysis.description && <p>{contentAnalysis.description}</p>}
+                </div>
+                {contentAnalysis.missingElements && contentAnalysis.missingElements.length > 0 && (
+                  <div className="analysis-card missing-analysis">
+                    <h3 style={{color:'#78350f'}}>⚠️ যা যোগ করুন</h3>
+                    <ul>{contentAnalysis.missingElements.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                  </div>
+                )}
+                {contentAnalysis.suggestions && contentAnalysis.suggestions.length > 0 && (
+                  <div className="analysis-card suggestion-analysis">
+                    <h3 style={{color:'#115e59'}}>✨ পরামর্শ</h3>
+                    <ul>{contentAnalysis.suggestions.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
 
         {/* Spelling Errors */}
-        {corrections.length > 0 && (viewFilter === 'all' || viewFilter === 'spelling') && (
+        {corrections.length > 0 && shouldShowSection('spelling') && (
           <>
             <div className="section-header">
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <button
-                  className="collapse-btn"
-                  onClick={() => toggleSection('spelling')}
-                  title={collapsed.spelling ? 'Expand' : 'Collapse'}
-                >
-                  {collapsed.spelling ? '＋' : '−'}
-                </button>
-                <h3>📝 বানান ভুল</h3>
-              </div>
+              <h3>📝 বানান ভুল</h3>
               <span className="section-badge" style={{background: '#fee2e2', color: '#dc2626'}}>{corrections.length}টি</span>
+              <button
+                className="collapse-btn"
+                onClick={() => toggleSection('spelling')}
+              >
+                {collapsedSections.spelling ? '➕' : '➖'}
+              </button>
             </div>
-            {!collapsed.spelling && corrections.map((c, i) => (
+            {!collapsedSections.spelling && corrections.map((c, i) => (
               <div
                 key={i}
                 className="suggestion-card error-card"
@@ -1127,22 +1084,19 @@ Response format (ONLY valid JSON, no extra text):
         )}
 
         {/* Tone Suggestions */}
-        {toneSuggestions.length > 0 && viewFilter === 'all' && (
+        {toneSuggestions.length > 0 && shouldShowSection('tone') && (
           <>
             <div className="section-header">
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <button
-                  className="collapse-btn"
-                  onClick={() => toggleSection('tone')}
-                  title={collapsed.tone ? 'Expand' : 'Collapse'}
-                >
-                  {collapsed.tone ? '＋' : '−'}
-                </button>
-                <h3>💬 টোন রূপান্তর</h3>
-              </div>
-               <span className="section-badge" style={{background: '#fef3c7', color: '#92400e'}}>{getToneName(selectedTone)}</span>
+              <h3>💬 টোন রূপান্তর</h3>
+              <span className="section-badge" style={{background: '#fef3c7', color: '#92400e'}}>{getToneName(selectedTone)}</span>
+              <button
+                className="collapse-btn"
+                onClick={() => toggleSection('tone')}
+              >
+                {collapsedSections.tone ? '➕' : '➖'}
+              </button>
             </div>
-            {!collapsed.tone && toneSuggestions.map((t, i) => (
+            {!collapsedSections.tone && toneSuggestions.map((t, i) => (
               <div
                 key={i}
                 className="suggestion-card warning-card"
@@ -1164,24 +1118,21 @@ Response format (ONLY valid JSON, no extra text):
         )}
 
         {/* Style Suggestions */}
-        {styleSuggestions.length > 0 && viewFilter === 'all' && (
+        {styleSuggestions.length > 0 && shouldShowSection('style') && (
           <>
             <div className="section-header">
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <button
-                  className="collapse-btn"
-                  onClick={() => toggleSection('style')}
-                  title={collapsed.style ? 'Expand' : 'Collapse'}
-                >
-                  {collapsed.style ? '＋' : '−'}
-                </button>
-                <h3>📝 ভাষারীতি</h3>
-              </div>
-               <span className="section-badge" style={{background: selectedStyle === 'sadhu' ? '#fef3c7' : '#ccfbf1', color: selectedStyle === 'sadhu' ? '#92400e' : '#0f766e'}}>
+              <h3>📝 ভাষারীতি</h3>
+              <span className="section-badge" style={{background: selectedStyle === 'sadhu' ? '#fef3c7' : '#ccfbf1', color: selectedStyle === 'sadhu' ? '#92400e' : '#0f766e'}}>
                  {selectedStyle === 'sadhu' ? '📜 সাধু রীতি' : '💬 চলিত রীতি'}
                </span>
+              <button
+                className="collapse-btn"
+                onClick={() => toggleSection('style')}
+              >
+                {collapsedSections.style ? '➕' : '➖'}
+              </button>
             </div>
-            {!collapsed.style && styleSuggestions.map((s, i) => (
+            {!collapsedSections.style && styleSuggestions.map((s, i) => (
               <div
                 key={i}
                 className="suggestion-card info-card"
@@ -1210,22 +1161,19 @@ Response format (ONLY valid JSON, no extra text):
         )}
 
         {/* Auto Style Mixing Detection */}
-        {languageStyleMixing?.detected && selectedStyle === 'none' && viewFilter === 'all' && (
+        {languageStyleMixing?.detected && selectedStyle === 'none' && shouldShowSection('mixing') && (
           <>
             <div className="section-header">
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <button
-                  className="collapse-btn"
-                  onClick={() => toggleSection('mixing')}
-                  title={collapsed.mixing ? 'Expand' : 'Collapse'}
-                >
-                  {collapsed.mixing ? '＋' : '−'}
-                </button>
-                <h3>🔄 মিশ্রণ সনাক্ত</h3>
-              </div>
+              <h3>🔄 মিশ্রণ সনাক্ত</h3>
               <span className="section-badge" style={{background: '#e9d5ff', color: '#6b21a8'}}>স্বয়ংক্রিয়</span>
+              <button
+                className="collapse-btn"
+                onClick={() => toggleSection('mixing')}
+              >
+                {collapsedSections.mixing ? '➕' : '➖'}
+              </button>
             </div>
-            {!collapsed.mixing && (
+            {!collapsedSections.mixing && (
               <>
                 <div className="suggestion-card purple-card" style={{background: 'rgba(237, 233, 254, 0.5)'}}>
                   <div style={{fontSize: '13px', fontWeight: 600, color: '#6b21a8'}}>
@@ -1259,33 +1207,30 @@ Response format (ONLY valid JSON, no extra text):
         )}
 
         {/* Punctuation */}
-        {punctuationIssues.length > 0 && (viewFilter === 'all' || viewFilter === 'punctuation') && (
+        {punctuationIssues.length > 0 && shouldShowSection('punctuation') && (
           <>
             <div className="section-header">
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <button
-                  className="collapse-btn"
-                  onClick={() => toggleSection('punctuation')}
-                  title={collapsed.punctuation ? 'Expand' : 'Collapse'}
-                >
-                  {collapsed.punctuation ? '＋' : '−'}
-                </button>
-                <h3>🔤 বিরাম চিহ্ন</h3>
-              </div>
+               <h3>🔤 বিরাম চিহ্ন</h3>
                <span className="section-badge" style={{background: '#fed7aa', color: '#c2410c'}}>{punctuationIssues.length}টি</span>
+               <button
+                 className="collapse-btn"
+                 onClick={() => toggleSection('punctuation')}
+               >
+                 {collapsedSections.punctuation ? '➕' : '➖'}
+               </button>
             </div>
-            {!collapsed.punctuation && punctuationIssues.map((p, i) => (
+            {!collapsedSections.punctuation && punctuationIssues.map((p, i) => (
               <div
                 key={i}
                 className="suggestion-card orange-card"
                 style={{position:'relative'}}
-                onMouseEnter={() => highlightInWord(p.currentSentence, '#ffedd5', p.position)}
+                onMouseEnter={() => highlightInWord(p.currentSentence, '#ffedd5')}
               >
                 <button onClick={() => dismissSuggestion('punct', p.currentSentence)} className="dismiss-btn" title="বাদ দিন">✕</button>
                 <div className="wrong-word" style={{color: '#ea580c'}}>⚠️ {p.issue}</div>
                 <div className="reason">{p.explanation}</div>
                 <button
-                  onClick={() => replaceInWord(p.currentSentence, p.correctedSentence, p.position)}
+                  onClick={() => replaceInWord(p.currentSentence, p.correctedSentence)}
                   className="suggestion-btn orange-btn"
                 >
                   ✓ {p.correctedSentence}
