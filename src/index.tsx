@@ -863,56 +863,63 @@ Response format (ONLY valid JSON, no extra text):
   return (
     <div className="app-container">
       {/* Header & Toolbar */}
-      <div className="header-section">
-        <div className="header-top">
-          <div className="app-title">
-            <h1>🌟 ভাষা মিত্র</h1>
-            <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
-          </div>
-        </div>
+<div className="header-section">
+  <div className="header-top">
+    {/* বাম পাশে মেনু বাটন */}
+    <button
+      className="menu-btn header-menu-btn"
+      onClick={() => setActiveModal('mainMenu')}
+      title="মেনু"
+    >
+      ☰
+    </button>
 
-        <div className="toolbar">
-          <div className="toolbar-top">
-            <button
-              className="menu-btn"
-              onClick={() => setActiveModal('mainMenu')}
-              title="মেনু"
-            >
-              ☰
-            </button>
-            <button 
-              onClick={checkSpelling} 
-              disabled={isLoading}
-              className="btn-check"
-            >
-              {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
-            </button>
-          </div>
+    {/* মাঝে টাইটেল */}
+    <div className="app-title">
+      <h1>🌟 ভাষা মিত্র</h1>
+      <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
+    </div>
 
-          <div className="toolbar-bottom">
-            <div className="view-filter">
-              <button
-                className={viewFilter === 'all' ? 'active' : ''}
-                onClick={() => setViewFilter('all')}
-              >
-                সব
-              </button>
-              <button
-                className={viewFilter === 'spelling' ? 'active' : ''}
-                onClick={() => setViewFilter('spelling')}
-              >
-                শুধু বানান
-              </button>
-              <button
-                className={viewFilter === 'punctuation' ? 'active' : ''}
-                onClick={() => setViewFilter('punctuation')}
-              >
-                শুধু বিরামচিহ্ন
-              </button>
-            </div>
-          </div>
-        </div>
+    {/* ডান পাশে ফাঁকা স্পেসার – শিরোনামকে ঠিকমতো মাঝখানে রাখার জন্য */}
+    <div className="header-spacer" />
+  </div>
+
+  <div className="toolbar">
+    <div className="toolbar-top">
+      {/* শুধু পরীক্ষা বাটন, ডান দিকে */}
+      <button 
+        onClick={checkSpelling} 
+        disabled={isLoading}
+        className="btn-check"
+      >
+        {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
+      </button>
+    </div>
+
+    <div className="toolbar-bottom">
+      <div className="view-filter">
+        <button
+          className={viewFilter === 'all' ? 'active' : ''}
+          onClick={() => setViewFilter('all')}
+        >
+          সব
+        </button>
+        <button
+          className={viewFilter === 'spelling' ? 'active' : ''}
+          onClick={() => setViewFilter('spelling')}
+        >
+          শুধু বানান
+        </button>
+        <button
+          className={viewFilter === 'punctuation' ? 'active' : ''}
+          onClick={() => setViewFilter('punctuation')}
+        >
+          শুধু বিরামচিহ্ন
+        </button>
       </div>
+    </div>
+  </div>
+</div>
 
       {/* Selection Display */}
       {(selectedTone || selectedStyle !== 'none' || docType !== 'generic') && (
