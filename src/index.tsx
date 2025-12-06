@@ -307,7 +307,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [activeModal, setActiveModal] = useState<'none' | 'settings' | 'instructions' | 'tone' | 'style' | 'doctype'>('none');
+  const [activeModal, setActiveModal] = useState<
+    'none' | 'settings' | 'instructions' | 'tone' | 'style' | 'doctype' | 'mainMenu'
+  >('none');
 
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all');
   const [collapsedSections, setCollapsedSections] = useState<Record<SectionKey, boolean>>({
@@ -357,13 +359,11 @@ function App() {
     setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Normalizes text for comparison
   const normalize = (str: string) => {
     if (!str) return '';
     return str.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
   };
 
-  // Chunking helper
   const chunkText = (text: string, maxChars = 2500): string[] => {
     const chunks: string[] = [];
     let start = 0;
@@ -418,7 +418,6 @@ function App() {
     await Word.run(async (context) => {
       const body = context.document.body;
 
-      // যদি position আছে এবং multi-word না হয়, তাহলে word index ব্যবহার
       if (typeof position === 'number' && position >= 0 && !hasSpace) {
         const whole = body.getRange("Whole");
         const words = whole.getTextRanges([" ", "\r", "\n", "\t"], true);
@@ -433,7 +432,6 @@ function App() {
         }
       }
 
-      // fallback: search ভিত্তিক highlight
       const results = body.search(cleanText, { 
         matchCase: false,
         matchWholeWord: !hasSpace,
@@ -460,7 +458,6 @@ function App() {
       const body = context.document.body;
 
       if (typeof position === 'number' && position >= 0 && !hasSpace) {
-        // word index ভিত্তিক replace (একটি শব্দ)
         const whole = body.getRange("Whole");
         const words = whole.getTextRanges([" ", "\r", "\n", "\t"], true);
         words.load("items");
@@ -476,7 +473,6 @@ function App() {
         }
       }
 
-      // fallback: search ভিত্তিক replace
       const results = body.search(cleanOldText, { 
         matchCase: false,
         matchWholeWord: !hasSpace,
@@ -554,7 +550,7 @@ function App() {
     }).catch(console.error);
   };
 
-  /* --- GEMINI JSON HELPER (with detailed error handling) --- */
+  /* --- GEMINI JSON HELPER --- */
   const callGeminiJson = async (
     prompt: string,
     { temperature = 0.2 }: { temperature?: number } = {}
@@ -692,7 +688,6 @@ function App() {
     }
   };
 
-  // MAIN CHECK with chunking & position merging
   const performMainCheck = async (text: string) => {
     const chunks = chunkText(text, 2500);
 
@@ -751,7 +746,6 @@ function App() {
       baseWordOffset += chunkWords;
     }
 
-    // sort by position
     allSpelling.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     allPunct.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     allEuphony.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -775,7 +769,6 @@ function App() {
       accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
     });
 
-    // Highlight spelling errors
     for (const err of allSpelling) {
       await highlightInWord(err.wrong, '#fee2e2', err.position);
     }
@@ -872,76 +865,52 @@ Response format (ONLY valid JSON, no extra text):
       {/* Header & Toolbar */}
       <div className="header-section">
         <div className="header-top">
-          <button className="icon-btn-small" onClick={() => setActiveModal('instructions')} title="সাহায্য">❓</button>
           <div className="app-title">
             <h1>🌟 ভাষা মিত্র</h1>
             <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
           </div>
-          <button className="icon-btn-small" onClick={() => setActiveModal('settings')} title="সেটিংস">⚙️</button>
         </div>
 
         <div className="toolbar">
-          <button
-            className={`icon-btn ${selectedTone ? 'active' : ''}`}
-            onClick={() => setActiveModal('tone')}
-            title="টোন/ভাব নির্বাচন"
-          >
-            <span className="icon">🗣️</span>
-            <span className="label">টোন</span>
-            {selectedTone && <span className="badge">✓</span>}
-          </button>
-
-          <button
-            className={`icon-btn ${selectedStyle !== 'none' ? 'active' : ''}`}
-            onClick={() => setActiveModal('style')}
-            title="ভাষারীতি নির্বাচন"
-          >
-             <span className="icon">📝</span>
-            <span className="label">ভাষারীতি</span>
-            {selectedStyle !== 'none' && <span className="badge">✓</span>}
-          </button>
-
-          <button
-            className={`icon-btn ${docType !== 'generic' ? 'active' : ''}`}
-            onClick={() => setActiveModal('doctype')}
-            title="ডকুমেন্ট টাইপ নির্বাচন"
-          >
-            <span className="icon">📂</span>
-            <span className="label">ডক টাইপ</span>
-            {docType !== 'generic' && <span className="badge">✓</span>}
-          </button>
-
-          <div style={{flex: 1}}></div>
-
-          {/* Filter */}
-          <div className="view-filter">
+          <div className="toolbar-top">
             <button
-              className={viewFilter === 'all' ? 'active' : ''}
-              onClick={() => setViewFilter('all')}
+              className="menu-btn"
+              onClick={() => setActiveModal('mainMenu')}
+              title="মেনু"
             >
-              সব
+              ☰
             </button>
-            <button
-              className={viewFilter === 'spelling' ? 'active' : ''}
-              onClick={() => setViewFilter('spelling')}
+            <button 
+              onClick={checkSpelling} 
+              disabled={isLoading}
+              className="btn-check"
             >
-              শুধু বানান
-            </button>
-            <button
-              className={viewFilter === 'punctuation' ? 'active' : ''}
-              onClick={() => setViewFilter('punctuation')}
-            >
-              শুধু বিরামচিহ্ন
+              {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
             </button>
           </div>
 
-          <button 
-            onClick={checkSpelling} 
-            disabled={isLoading}
-            className="btn-check"
-          >
-            {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
-          </button>
+          <div className="toolbar-bottom">
+            <div className="view-filter">
+              <button
+                className={viewFilter === 'all' ? 'active' : ''}
+                onClick={() => setViewFilter('all')}
+              >
+                সব
+              </button>
+              <button
+                className={viewFilter === 'spelling' ? 'active' : ''}
+                onClick={() => setViewFilter('spelling')}
+              >
+                শুধু বানান
+              </button>
+              <button
+                className={viewFilter === 'punctuation' ? 'active' : ''}
+                onClick={() => setViewFilter('punctuation')}
+              >
+                শুধু বিরামচিহ্ন
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1286,6 +1255,84 @@ Response format (ONLY valid JSON, no extra text):
       </div>
 
       {/* --- MODALS --- */}
+
+      {/* Main Menu Modal */}
+      {activeModal === 'mainMenu' && (
+        <div className="modal-overlay" onClick={() => setActiveModal('none')}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header menu-header">
+              <h3>☰ মেনু</h3>
+              <button onClick={() => setActiveModal('none')}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div
+                className="option-item"
+                onClick={() => setActiveModal('tone')}
+              >
+                <div className="opt-icon">🗣️</div>
+                <div style={{flex:1}}>
+                  <div className="opt-title">টোন / ভাব</div>
+                  <div className="opt-desc">
+                    {selectedTone ? getToneName(selectedTone) : 'কোনো নির্দিষ্ট টোন সেট নেই'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="option-item"
+                onClick={() => setActiveModal('style')}
+              >
+                <div className="opt-icon">📝</div>
+                <div style={{flex:1}}>
+                  <div className="opt-title">ভাষারীতি (সাধু / চলিত)</div>
+                  <div className="opt-desc">
+                    {selectedStyle === 'none'
+                      ? 'স্বয়ংক্রিয় মিশ্রণ সনাক্তকরণ চালু'
+                      : selectedStyle === 'sadhu'
+                      ? 'বর্তমান: সাধু রীতি'
+                      : 'বর্তমান: চলিত রীতি'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="option-item"
+                onClick={() => setActiveModal('doctype')}
+              >
+                <div className="opt-icon">📂</div>
+                <div style={{flex:1}}>
+                  <div className="opt-title">ডকুমেন্ট টাইপ</div>
+                  <div className="opt-desc">
+                    বর্তমান: {getDocTypeLabel(docType)}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="option-item"
+                onClick={() => setActiveModal('settings')}
+              >
+                <div className="opt-icon">⚙️</div>
+                <div style={{flex:1}}>
+                  <div className="opt-title">সেটিংস</div>
+                  <div className="opt-desc">API Key, মডেল, ডিফল্ট ডক টাইপ</div>
+                </div>
+              </div>
+
+              <div
+                className="option-item"
+                onClick={() => setActiveModal('instructions')}
+              >
+                <div className="opt-icon">❓</div>
+                <div style={{flex:1}}>
+                  <div className="opt-title">ব্যবহার নির্দেশিকা</div>
+                  <div className="opt-desc">কিভাবে এই অ্যাড-ইন ব্যবহার করবেন</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Settings Modal */}
       {activeModal === 'settings' && (
@@ -1337,8 +1384,8 @@ Response format (ONLY valid JSON, no extra text):
                 <li style={{marginBottom:'10px'}}>⚙️ সেটিংস থেকে API Key দিন</li>
                 <li style={{marginBottom:'10px'}}>📂 প্রয়োজন হলে ডক টাইপ নির্বাচন করুন (একাডেমিক/অফিসিয়াল/মার্কেটিং ইত্যাদি)</li>
                 <li style={{marginBottom:'10px'}}>✍️ বাংলা টেক্সট সিলেক্ট করুন অথবা সম্পূর্ণ ডকুমেন্ট চেক করুন</li>
-                <li style={{marginBottom:'10px'}}>💬 <strong>টোন</strong> আইকনে ক্লিক করে ভাব নির্বাচন করুন (ঐচ্ছিক)</li>
-                <li style={{marginBottom:'10px'}}>📝 <strong>ভাষারীতি</strong> আইকনে ক্লিক করে সাধু/চলিত নির্বাচন করুন (ঐচ্ছিক)</li>
+                <li style={{marginBottom:'10px'}}>💬 <strong>টোন</strong> (মেনু থেকে) নির্বাচন করুন (ঐচ্ছিক)</li>
+                <li style={{marginBottom:'10px'}}>📝 <strong>ভাষারীতি</strong> (মেনু থেকে) নির্বাচন করুন (ঐচ্ছিক)</li>
                 <li style={{marginBottom:'10px'}}>🔍 "পরীক্ষা করুন" বাটনে ক্লিক করুন</li>
                 <li style={{marginBottom:'10px'}}>🔎 উপরের ফিল্টার থেকে "শুধু বানান / শুধু বিরামচিহ্ন / সব" বেছে নিন</li>
                 <li>✓ সাজেশনে ক্লিক করে প্রতিস্থাপন করুন বা ✕ দিয়ে বাতিল করুন</li>
@@ -1449,7 +1496,6 @@ Response format (ONLY valid JSON, no extra text):
                     className={`option-item ${docType === dt ? 'selected' : ''}`}
                     onClick={() => {
                       setDocType(dt);
-                      // যদি tone আগে থেকে সেট না থাকে তবে ডক টাইপের default tone সেট করা
                       if (!selectedTone && cfg.defaultTone) {
                         setSelectedTone(cfg.defaultTone);
                       }
