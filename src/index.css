@@ -42,17 +42,17 @@ body {
 
 .header-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .app-title {
   text-align: center;
   flex: 1;
 }
-.app-title h1 { font-size: 25px; font-weight: 700; margin: 0; }
-.app-title p { font-size: 15px; opacity: 0.9; margin: 0; }
+.app-title h1 { font-size: 22px; font-weight: 700; margin: 0; }
+.app-title p { font-size: 13px; opacity: 0.9; margin: 0; }
 
 .icon-btn-small {
   background: rgba(255,255,255,0.2);
@@ -68,16 +68,50 @@ body {
   justify-content: center;
 }
 
+/* Toolbar – দুই লাইন: উপরে মেনু + পরীক্ষা, নিচে ফিল্টার */
 .toolbar {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   background: rgba(255,255,255,0.15);
-  padding: 10px;
+  padding: 8px;
   border-radius: 12px;
-  align-items: center;
 }
 
-/* Small view filter (সব / শুধু বানান / শুধু বিরামচিহ্ন) */
+.toolbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar-bottom {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ছোট মেনু বাটন ☰ */
+.menu-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.menu-btn:hover {
+  background: white;
+  transform: translateY(-1px);
+}
+
+/* ছোট view filter (সব / শুধু বানান / শুধু বিরামচিহ্ন) */
 .view-filter {
   display: inline-flex;
   background: rgba(255,255,255,0.2);
@@ -109,6 +143,7 @@ body {
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
 }
 
+/* পুরনো icon-btn স্টাইল (এখন toolbar-এ ব্যবহার হচ্ছে না, কিন্তু রেখে দিচ্ছি ভবিষ্যতের জন্য) */
 .icon-btn {
   width: 46px;
   height: 46px;
@@ -144,11 +179,11 @@ body {
   background: white;
   color: #667eea;
   border: none;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   font-family: 'Noto Sans Bengali', sans-serif;
   transition: all 0.3s;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -158,30 +193,29 @@ body {
 
 /* Selection Tags */
 .selection-display {
-    padding: 10px 14px;
-    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-    border-bottom: 2px solid #c7d2fe;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  border-bottom: 2px solid #c7d2fe;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .selection-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 600;
 }
 .tone-tag { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; }
 .style-tag { background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); color: #6d28d9; }
-/* নতুন Doc Type ট্যাগ */
 .doc-type-tag {
-    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-    color: #075985;
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #075985;
 }
 
 .clear-btn {
-    background: rgba(0,0,0,0.15); border: none; border-radius: 50%;
-    width: 16px; height: 16px; cursor: pointer; font-size: 9px;
-    display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.15); border: none; border-radius: 50%;
+  width: 14px; height: 14px; cursor: pointer; font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
 }
 
 /* Content Area */
@@ -317,7 +351,7 @@ body {
 }
 .orange-btn {
   background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-color: #6ee7b7;
+  border-color: #6eead7;
   color: #065f46;
 }
 
@@ -353,7 +387,7 @@ body {
 
 /* Footer */
 .footer {
-  padding: 12px;
+  padding: 10px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   text-align: center;
   flex-shrink: 0;
@@ -389,6 +423,8 @@ body {
 .instructions-header { background: linear-gradient(135deg, #0d9488 0%, #06b6d4 100%); }
 .tone-header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
 .style-header { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); }
+/* নতুন main menu header */
+.menu-header { background: linear-gradient(135deg, #4b5563 0%, #111827 100%); }
 
 .modal-body { padding: 20px; overflow-y: auto; }
 .modal-body label {
@@ -408,7 +444,7 @@ body {
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
-/* Option Items (Tone/Style/Doc Type list) */
+/* Option Items (Tone/Style/Doc Type/Menu) */
 .option-item {
   display: flex; align-items: center; gap: 14px;
   padding: 14px; border: 2px solid #e5e7eb; border-radius: 14px;
