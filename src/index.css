@@ -114,12 +114,12 @@ body {
 .toolbar-top {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;   /* উপরের লাইন মাঝখানে */
 }
 
 .toolbar-bottom {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;   /* নিচের ফিল্টারও মাঝখানে */
 }
 
 /* view filter (সব / শুধু বানান / শুধু বিরামচিহ্ন) */
