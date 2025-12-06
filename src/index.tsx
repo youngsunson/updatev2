@@ -74,14 +74,14 @@ const buildTonePrompt = (text: string, tone: string) => {
   return `${toneInstructions[tone]}
 
 📝 **বিশ্লেষণের জন্য টেক্সট:**
-"${text}"
+"""${text}"""
 
 📋 **আপনার কাজ:**
 1. টেক্সটের প্রতিটি শব্দ ও বাক্যাংশ বিশ্লেষণ করুন।
 2. কাঙ্ক্ষিত টোনে নেই এমন শব্দগুলো চিহ্নিত করুন।
 3. **গুরুত্বপূর্ণ:** "current" ফিল্ডে শব্দটি হুবহু ইনপুট টেক্সট থেকে কপি করবেন (কোনো পরিবর্তন ছাড়া)।
 
-📤 **Response Format (JSON only):**
+📤 Response Format (ONLY valid JSON, no markdown, no extra text):
 {
   "toneConversions": [
     {
@@ -90,7 +90,9 @@ const buildTonePrompt = (text: string, tone: string) => {
       "reason": "কারণ"
     }
   ]
-}`;
+}
+
+যদি কোনো পরিবর্তন প্রয়োজন না হয়, তাহলে "toneConversions": [] খালি array রাখবেন।`;
 };
 
 const buildStylePrompt = (text: string, style: string) => {
@@ -103,14 +105,14 @@ const buildStylePrompt = (text: string, style: string) => {
 
 ═══════════════════════════════════════
 📝 বিশ্লেষণের জন্য টেক্সট:
-"${text}"
+"""${text}"""
 ═══════════════════════════════════════
 
 ⚠️ **সতর্কতা:**
 - "current" ফিল্ডে শব্দটি টেক্সট থেকে **হুবহু কপি** করবেন।
 - যদি কোন শব্দ পরিবর্তন প্রয়োজন না হয় তবে সেটি বাদ দিন।
 
-📤 **Response Format (JSON only):**
+📤 Response Format (ONLY valid JSON, no markdown, no extra text):
 {
   "styleConversions": [
     {
@@ -119,8 +121,81 @@ const buildStylePrompt = (text: string, style: string) => {
       "type": "ক্রিয়াপদ/সর্বনাম/অব্যয়"
     }
   ]
-}`;
+}
+
+যদি কোনো পরিবর্তন প্রয়োজন না হয়, তাহলে "styleConversions": [] খালি array রাখবেন।`;
 };
+
+const buildMainPrompt = (text: string) => `
+আপনি একজন দক্ষ বাংলা প্রুফরিডার।
+
+নিচের টেক্সটটি খুব মনোযোগ দিয়ে বিশ্লেষণ করুন:
+
+"""${text}"""
+
+⚠️ কড়া নির্দেশনা:
+
+১. বানান ভুল (spellingErrors)
+   - শুধু একদম নিশ্চিত ভুল বানান ধরবেন (যেমন যুক্তাক্ষর, ণত্ব-ষত্ব, স্পষ্ট টাইপো)।
+   - নাম, ব্র্যান্ড, টেকনিক্যাল টার্ম, ইংরেজি শব্দের বানান পরিবর্তন করবেন না।
+   - "wrong" ফিল্ডে ইনপুটের শব্দটি হুবহু কপি করবেন।
+   - "suggestions"–এ ১–৩টি বাস্তবসম্মত সঠিক বানান দিন।
+
+২. বিরাম চিহ্ন (punctuationIssues)
+   - একমাত্র তখনই সমস্যা ধরবেন যখন:
+     - পূর্ণাঙ্গ, লম্বা বাক্যের শেষে কোনো দাঁড়ি/প্রশ্নবোধক/বিস্ময়সূচক/ড্যাশ নেই।
+   - শিরোনাম, তালিকা, কবিতায় দাঁড়ি না থাকলেও সেটিকে ভুল ধরবেন না।
+   - "currentSentence" ফিল্ডে ইনপুট বাক্য হুবহু কপি করবেন।
+   - "correctedSentence" শুধু যতিচিহ্ন/খুব সামান্য গঠন ঠিক করবে; পুরো বাক্য নতুন করে লিখবেন না।
+
+৩. ভাষারীতি মিশ্রণ (languageStyleMixing)
+   - সাধু ও চলিত রীতি একসাথে ব্যবহৃত হলে তবেই detected = true করুন।
+   - খুব বেশি পরিবর্তন না করে, একই ধরণের শব্দে সামঞ্জস্য আনার সাজেশন দিবেন।
+   - "current" ফিল্ডে ইনপুটের অংশ হুবহু কপি করবেন।
+
+৪. শ্রুতিমধুরতা (euphonyImprovements)
+   - কেবল তখনই সাজেশন দেবেন যখন কোনো শব্দ/বাক্যাংশ সত্যিই কানে বিরক্তিকর বা অতিরিক্ত ভারী শোনায়।
+   - অর্থের বড় পরিবর্তন করবেন না, শুধু সামান্য শব্দ বাছাই ভালো করবেন।
+
+📤 আউটপুট ফরম্যাট (ONLY valid JSON, কোনো markdown code block, ব্যাখ্যা বা অতিরিক্ত টেক্সট নয়):
+
+{
+  "spellingErrors": [
+    {
+      "wrong": "ভুল_শব্দ",
+      "suggestions": ["সঠিক ১", "সঠিক ২"],
+      "position": 0
+    }
+  ],
+  "languageStyleMixing": {
+    "detected": true,
+    "recommendedStyle": "সাধু/চলিত",
+    "reason": "সংক্ষিপ্ত কারণ",
+    "corrections": [
+      {
+        "current": "শব্দ",
+        "suggestion": "সংশোধন",
+        "type": "সাধু→চলিত"
+      }
+    ]
+  },
+  "punctuationIssues": [
+    {
+      "issue": "সমস্যা",
+      "currentSentence": "ইনপুট বাক্য",
+      "correctedSentence": "সংশোধিত বাক্য",
+      "explanation": "ব্যাখ্যা"
+    }
+  ],
+  "euphonyImprovements": [
+    {
+      "current": "শব্দ/বাক্যাংশ",
+      "suggestions": ["বিকল্প"],
+      "reason": "কেন এটি ভালো"
+    }
+  ]
+}
+`;
 
 /* -------------------------------------------------------------------------- */
 /*                           MAIN COMPONENT                                   */
@@ -139,7 +214,7 @@ function App() {
   
   // Selection State
   const [selectedTone, setSelectedTone] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState('none');
+  const [selectedStyle, setSelectedStyle] = useState<'none' | 'sadhu' | 'cholito'>('none');
 
   // Data State
   const [corrections, setCorrections] = useState<Correction[]>([]);
@@ -153,7 +228,7 @@ function App() {
   const [stats, setStats] = useState({ totalWords: 0, errorCount: 0, accuracy: 100 });
 
   useEffect(() => {
-    // Initialize Office
+    // Initialize logic if needed
   }, []);
 
   /* --- HELPERS --- */
@@ -169,31 +244,31 @@ function App() {
     setActiveModal('none');
   };
 
+  // CRITICAL HELPER: Normalizes text for accurate comparison
+  const normalize = (str: string) => {
+    if (!str) return '';
+    return str.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+  };
+
   /* --- WORD API INTERACTION --- */
-  
-  // IMPROVEMENT 1: Selection vs Whole Document Check
   const getTextFromWord = async (): Promise<string> => {
     return new Promise((resolve) => {
       Word.run(async (context) => {
-        // Check for selection first
         const selection = context.document.getSelection();
         selection.load(['text', 'isEmpty']);
         await context.sync();
 
         let targetText = '';
-
         if (!selection.isEmpty && selection.text.trim().length > 0) {
-          // User has selected text
           targetText = selection.text;
         } else {
-          // No selection, get whole body
           const body = context.document.body;
           body.load('text');
           await context.sync();
           targetText = body.text;
         }
         
-        // Normalize newlines to help AI understand structure
+        // Convert all line endings to simple \n for the AI
         const cleanText = targetText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         resolve(cleanText);
       }).catch((error) => {
@@ -207,11 +282,12 @@ function App() {
     const cleanText = text.trim();
     if (!cleanText) return;
 
+    const hasSpace = /\s/.test(cleanText);
+
     await Word.run(async (context) => {
-      // Search logic
       const results = context.document.body.search(cleanText, { 
-        matchCase: false, 
-        matchWholeWord: false, 
+        matchCase: false,
+        matchWholeWord: !hasSpace, // এক শব্দ হলে whole word, ফ্রেজ হলে না
         ignoreSpace: true 
       });
       results.load('font');
@@ -224,16 +300,17 @@ function App() {
     }).catch(console.error);
   };
 
-  // IMPROVEMENT 3: Safer Replacement with matchWholeWord & State Update
   const replaceInWord = async (oldText: string, newText: string) => {
     const cleanOldText = oldText.trim();
+    if (!cleanOldText) return;
+    
+    const hasSpace = /\s/.test(cleanOldText);
     let success = false;
 
     await Word.run(async (context) => {
-      // Use matchWholeWord: true to avoid partial replacements (e.g. 'ban' inside 'band')
       const results = context.document.body.search(cleanOldText, { 
-        matchCase: true, 
-        matchWholeWord: true, 
+        matchCase: false,                  // case‑এ strict না
+        matchWholeWord: !hasSpace,         // বাক্য/ফ্রেজের জন্য false
         ignoreSpace: true 
       });
       results.load('items');
@@ -250,8 +327,8 @@ function App() {
     }).catch(console.error);
 
     if (success) {
-      // Update UI State accurately
-      const isNotMatch = (textToCheck: string) => textToCheck.trim() !== cleanOldText;
+      const target = normalize(cleanOldText);
+      const isNotMatch = (textToCheck: string) => normalize(textToCheck) !== target;
 
       setCorrections(prev => prev.filter(c => isNotMatch(c.wrong)));
       setToneSuggestions(prev => prev.filter(t => isNotMatch(t.current)));
@@ -267,14 +344,13 @@ function App() {
 
       showMessage(`সংশোধিত হয়েছে ✓`, 'success');
     } else {
-      showMessage(`শব্দটি খুঁজে পাওয়া যায়নি (অন্য কোথাও পরিবর্তিত হতে পারে)।`, 'error');
+      showMessage(`শব্দটি ডকুমেন্টে খুঁজে পাওয়া যায়নি।`, 'error');
     }
   };
 
-  // IMPROVEMENT 2: Dismiss/Ignore Function
   const dismissSuggestion = (type: 'spelling' | 'tone' | 'style' | 'mixing' | 'punct' | 'euphony', textToDismiss: string) => {
-    const cleanText = textToDismiss.trim();
-    const isNotMatch = (t: string) => t.trim() !== cleanText;
+    const target = normalize(textToDismiss);
+    const isNotMatch = (t: string) => normalize(t) !== target;
 
     switch(type) {
       case 'spelling':
@@ -309,6 +385,55 @@ function App() {
     }).catch(console.error);
   };
 
+  /* --- GEMINI JSON HELPER --- */
+  const callGeminiJson = async (
+    prompt: string,
+    { temperature = 0.2 }: { temperature?: number } = {}
+  ): Promise<any | null> => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Gemini API error (${response.status}): ${body || response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return null;
+
+    const raw = parts.map((p: any) => p.text ?? '').join('').trim();
+    if (!raw) return null;
+
+    // ১ম চেষ্টা: পুরো টেক্সটকে JSON ধরে পার্স
+    try {
+      return JSON.parse(raw);
+    } catch {
+      // ২য় চেষ্টা: শুধু { ... } অংশ কেটে নিয়ে পার্স
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+  };
+
   /* --- API LOGIC --- */
   const checkSpelling = async () => {
     if (!apiKey) {
@@ -333,6 +458,7 @@ function App() {
     setPunctuationIssues([]);
     setEuphonyImprovements([]);
     setContentAnalysis(null);
+    setStats({ totalWords: 0, errorCount: 0, accuracy: 100 });
 
     await clearHighlights();
 
@@ -340,206 +466,119 @@ function App() {
       setLoadingText('বানান ও ব্যাকরণ দেখা হচ্ছে...');
       await performMainCheck(text);
 
+      const extraTasks: Promise<void>[] = [];
+
       if (selectedTone) {
-        setLoadingText('টোন বিশ্লেষণ...');
-        await performToneCheck(text);
+        extraTasks.push((async () => {
+          setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
+          await performToneCheck(text);
+        })());
       }
 
       if (selectedStyle !== 'none') {
-        setLoadingText('ভাষারীতি বিশ্লেষণ...');
-        await performStyleCheck(text);
+        extraTasks.push((async () => {
+          setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
+          await performStyleCheck(text);
+        })());
       }
 
-      setLoadingText('সারাংশ তৈরি হচ্ছে...');
-      await analyzeContent(text);
+      extraTasks.push((async () => {
+        setLoadingText('সারাংশ তৈরি হচ্ছে...');
+        await analyzeContent(text);
+      })());
 
-    } catch (error) {
+      await Promise.all(extraTasks);
+    } catch (error: any) {
       console.error(error);
-      showMessage('ত্রুটি হয়েছে। API Key যাচাই করুন।', 'error');
+      showMessage(
+        error?.message || 'ত্রুটি হয়েছে। API Key, Model বা নেটওয়ার্ক চেক করুন।',
+        'error'
+      );
     } finally {
       setIsLoading(false);
       setLoadingText('');
     }
   };
 
-  // IMPROVEMENT 4: Enforce JSON Mode in API Calls
   const performMainCheck = async (text: string) => {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `আপনি একজন দক্ষ বাংলা প্রুফরিডার। নিচের টেক্সটটি খুঁটিয়ে দেখুন।
+    const result = await callGeminiJson(buildMainPrompt(text), { temperature: 0.1 });
+    if (!result) throw new Error('Gemini থেকে ফলাফল পাওয়া যায়নি।');
 
-টেক্সট:
-"""
-${text}
-"""
+    const spellingErrors: Correction[] = result.spellingErrors || [];
+    const mixing: StyleMixing | null = result.languageStyleMixing || null;
+    const punct: PunctuationIssue[] = result.punctuationIssues || [];
+    const euphony: EuphonyImprovement[] = result.euphonyImprovements || [];
 
-⚠️ **কঠোর নির্দেশনাবলী (Strict Instructions):**
-১. **বানান ভুল:** শুধুমাত্র নিশ্চিত ভুল বানান ধরুন (যুক্তাক্ষর, ণত্ব-ষত্ব)।
-২. **বিরাম চিহ্ন ও প্যারাগ্রাফ:** 
-   - টেক্সটের **লাইন ব্রেক (Newlines)** খেয়াল রাখুন।
-   - আলাদা প্যারাগ্রাফকে জোর করে এক করবেন না।
-   - **শিরোনাম, কবিতার লাইন, বা তালিকার আইটেম**-এর শেষে দাড়ি/কমা না থাকলে সেটাকে ভুল ধরবেন না।
-   - শুধুমাত্র পূর্ণ বাক্যের শেষে যতিচিহ্ন না থাকলে সেটা ধরুন।
-৩. **ভাষা মিশ্রণ:** সাধু ও চলিত রীতির মিশ্রণ আছে কিনা দেখুন।
+    setCorrections(spellingErrors);
+    setLanguageStyleMixing(mixing);
+    setPunctuationIssues(punct);
+    setEuphonyImprovements(euphony);
 
-⚠️ **JSON Output Rules:**
-- **spellingErrors:** "wrong" ফিল্ডে শব্দটি হুবহু ইনপুট থেকে কপি করবেন।
-- **punctuationIssues:** "currentSentence" ফিল্ডে ইনপুটের বাক্যটি হুবহু কপি করবেন (কোনো শব্দ যোগ/বियोग করবেন না)।
+    const words = text.trim().split(/\s+/).filter(Boolean).length;
+    const errors = spellingErrors.length;
 
-Response format (JSON):
-{
-  "spellingErrors": [
-    {"wrong": "ভুল_শব্দ", "suggestions": ["সঠিক ১", "সঠিক ২"], "position": 0}
-  ],
-  "languageStyleMixing": {
-    "detected": true/false,
-    "recommendedStyle": "সাধু/চলিত",
-    "reason": "সংক্ষিপ্ত কারণ",
-    "corrections": [{"current": "শব্দ", "suggestion": "সংশোধন", "type": "সাধু→চলিত"}]
-  },
-  "punctuationIssues": [
-    {"issue": "সমস্যা", "currentSentence": "ইনপুট বাক্য", "correctedSentence": "সংশোধিত বাক্য", "explanation": "ব্যাখ্যা"}
-  ],
-  "euphonyImprovements": [
-    {"current": "শব্দ/বাক্যাংশ", "suggestions": ["বিকল্প"], "reason": "কেন এটি ভালো"}
-  ]
-}`
-            }]
-          }],
-          // Force JSON response for reliability
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      }
-    );
+    setStats({
+      totalWords: words,
+      errorCount: errors,
+      accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
+    });
 
-    const data = await response.json();
-    if (!data.candidates || !data.candidates[0].content) {
-       throw new Error("No content received");
-    }
-    
-    const resultText = data.candidates[0].content.parts[0].text;
-    
-    // Parse JSON (Use regex to find the object even if there is markdown wrapper)
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-
-    if (jsonMatch) {
-      try {
-        const result = JSON.parse(jsonMatch[0]);
-        setCorrections(result.spellingErrors || []);
-        setLanguageStyleMixing(result.languageStyleMixing || null);
-        setPunctuationIssues(result.punctuationIssues || []);
-        setEuphonyImprovements(result.euphonyImprovements || []);
-
-        const words = text.trim().split(/\s+/).length;
-        const errors = (result.spellingErrors?.length || 0);
-        setStats({
-          totalWords: words,
-          errorCount: errors,
-          accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
-        });
-
-        for (const err of (result.spellingErrors || [])) {
-          await highlightInWord(err.wrong, '#fee2e2');
-        }
-      } catch (e) {
-        console.error("JSON Parse Error", e);
-      }
+    for (const err of spellingErrors) {
+      await highlightInWord(err.wrong, '#fee2e2');
     }
   };
 
   const performToneCheck = async (text: string) => {
     const prompt = buildTonePrompt(text, selectedTone);
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          contents: [{ parts: [{ text: `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে খালি array দিন।` }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      }
+    const result = await callGeminiJson(
+      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "toneConversions": [] খালি array রাখবেন।`,
+      { temperature: 0.2 }
     );
-    const data = await response.json();
-    if (!data.candidates) return;
-    
-    const resultText = data.candidates[0].content.parts[0].text;
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      setToneSuggestions(result.toneConversions || []);
-      for (const t of (result.toneConversions || [])) {
-        await highlightInWord(t.current, '#fef3c7');
-      }
+    if (!result) return;
+
+    const toneConversions: ToneSuggestion[] = result.toneConversions || [];
+    setToneSuggestions(toneConversions);
+
+    for (const t of toneConversions) {
+      await highlightInWord(t.current, '#fef3c7');
     }
   };
 
   const performStyleCheck = async (text: string) => {
     const prompt = buildStylePrompt(text, selectedStyle);
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          contents: [{ parts: [{ text: `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে খালি array দিন।` }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      }
+    const result = await callGeminiJson(
+      `${prompt}\n\nযদি কোন পরিবর্তন প্রয়োজন না হয় তাহলে "styleConversions": [] খালি array রাখবেন।`,
+      { temperature: 0.2 }
     );
-    const data = await response.json();
-    if (!data.candidates) return;
+    if (!result) return;
 
-    const resultText = data.candidates[0].content.parts[0].text;
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      setStyleSuggestions(result.styleConversions || []);
-      for (const s of (result.styleConversions || [])) {
-        await highlightInWord(s.current, '#ccfbf1');
-      }
+    const styleConversions: StyleSuggestion[] = result.styleConversions || [];
+    setStyleSuggestions(styleConversions);
+
+    for (const s of styleConversions) {
+      await highlightInWord(s.current, '#ccfbf1');
     }
   };
 
   const analyzeContent = async (text: string) => {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `বাংলা লেখাটি খুব সংক্ষেপে বিশ্লেষণ করুন:
-"${text}"
+    const prompt = `
+বাংলা লেখাটি খুব সংক্ষেপে বিশ্লেষণ করুন:
 
-Response format (JSON):
+"""${text}"""
+
+Response format (ONLY valid JSON, no extra text):
+
 {
   "contentType": "লেখার ধরন (১-২ শব্দ)",
   "description": "খুব সংক্ষিপ্ত বর্ণনা (১ লাইন)",
   "missingElements": ["গুরুত্বপূর্ণ ১-২টি জিনিস যা নেই"],
   "suggestions": ["১টি প্রধান পরামর্শ"]
-}`
-            }]
-          }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      }
-    );
-    const data = await response.json();
-    if (!data.candidates) return;
+}
+`;
+    const result = await callGeminiJson(prompt, { temperature: 0.5 });
+    if (!result) return;
 
-    const resultText = data.candidates[0].content.parts[0].text;
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      setContentAnalysis(JSON.parse(jsonMatch[0]));
-    }
+    setContentAnalysis(result as ContentAnalysis);
   };
 
   /* --- RENDER HELPERS --- */
@@ -889,7 +928,11 @@ Response format (JSON):
                 {id: 'neutral', icon: '⚖️', title: 'নিরপেক্ষ (Neutral)', desc: 'সংবাদ, তথ্যমূলক লেখা'},
                 {id: 'academic', icon: '📚', title: 'শিক্ষামূলক (Academic)', desc: 'গবেষণা পত্র, প্রবন্ধ'}
               ].map(opt => (
-                <div key={opt.id} className={`option-item ${selectedTone === opt.id ? 'selected' : ''}`} onClick={() => {setSelectedTone(opt.id); setActiveModal('none');}}>
+                <div
+                  key={opt.id}
+                  className={`option-item ${selectedTone === opt.id ? 'selected' : ''}`}
+                  onClick={() => { setSelectedTone(opt.id); setActiveModal('none'); }}
+                >
                   <div className="opt-icon">{opt.icon}</div>
                   <div style={{flex:1}}>
                     <div className="opt-title">{opt.title}</div>
@@ -917,7 +960,11 @@ Response format (JSON):
                 {id: 'sadhu', icon: '📜', title: 'সাধু রীতি', desc: 'করিতেছি, করিয়াছি, তাহার, যাহা'},
                 {id: 'cholito', icon: '💬', title: 'চলিত রীতি', desc: 'করছি, করেছি, তার, যা'}
               ].map(opt => (
-                <div key={opt.id} className={`option-item ${selectedStyle === opt.id ? 'selected' : ''}`} onClick={() => {setSelectedStyle(opt.id); setActiveModal('none');}}>
+                <div
+                  key={opt.id}
+                  className={`option-item ${selectedStyle === opt.id ? 'selected' : ''}`}
+                  onClick={() => { setSelectedStyle(opt.id as any); setActiveModal('none'); }}
+                >
                   <div className="opt-icon">{opt.icon}</div>
                   <div style={{flex:1}}>
                     <div className="opt-title">{opt.title}</div>
