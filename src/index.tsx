@@ -11,28 +11,28 @@ type DocType = 'generic' | 'academic' | 'official' | 'marketing' | 'social';
 interface Correction {
   wrong: string;
   suggestions: string[];
-  position?: number; // 0-based word index in full document
+  position?: number; 
 }
 
 interface ToneSuggestion {
   current: string;
   suggestion: string;
   reason: string;
-  position?: number; // 0-based word index (approx)
+  position?: number;
 }
 
 interface StyleSuggestion {
   current: string;
   suggestion: string;
   type: string;
-  position?: number; // 0-based word index (approx)
+  position?: number;
 }
 
 interface StyleMixingCorrection {
   current: string;
   suggestion: string;
   type: string;
-  position?: number; // 0-based word index
+  position?: number;
 }
 
 interface StyleMixing {
@@ -47,14 +47,14 @@ interface PunctuationIssue {
   currentSentence: string;
   correctedSentence: string;
   explanation: string;
-  position?: number; // start word index of the sentence (optional)
+  position?: number;
 }
 
 interface EuphonyImprovement {
   current: string;
   suggestions: string[];
   reason: string;
-  position?: number; // 0-based word index (first word of phrase)
+  position?: number;
 }
 
 interface ContentAnalysis {
@@ -298,7 +298,7 @@ type ViewFilter = 'all' | 'spelling' | 'punctuation';
 function App() {
   // Settings State
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-1.5-flash');
   const [docType, setDocType] = useState<DocType>(
     (localStorage.getItem('doc_type') as DocType) || 'generic'
   );
@@ -346,6 +346,9 @@ function App() {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 4000);
   };
+
+  // NEW: Delay Helper for Rate Limiting
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const saveSettings = () => {
     localStorage.setItem('gemini_api_key', apiKey);
@@ -622,7 +625,7 @@ function App() {
     }
   };
 
-  /* --- API LOGIC --- */
+  /* --- API LOGIC (UPDATED WITH DELAYS) --- */
   const checkSpelling = async () => {
     if (!apiKey) {
       showMessage('অনুগ্রহ করে প্রথমে API Key দিন', 'error');
@@ -639,6 +642,7 @@ function App() {
     setIsLoading(true);
     setLoadingText('বিশ্লেষণ করা হচ্ছে...');
     
+    // Reset states
     setCorrections([]);
     setToneSuggestions([]);
     setStyleSuggestions([]);
@@ -651,31 +655,31 @@ function App() {
     await clearHighlights();
 
     try {
+      // 1. Perform Main Check (Spelling/Grammar)
       setLoadingText('বানান ও ব্যাকরণ দেখা হচ্ছে...');
       await performMainCheck(text);
 
-      const extraTasks: Promise<void>[] = [];
+      // Add Delay (2s) to avoid Rate Limit
+      await delay(2000);
 
+      // 2. Perform Tone Check (if selected)
       if (selectedTone) {
-        extraTasks.push((async () => {
-          setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
-          await performToneCheck(text);
-        })());
+        setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
+        await performToneCheck(text);
+        await delay(2000); // Wait before next request
       }
 
+      // 3. Perform Style Check (if selected)
       if (selectedStyle !== 'none') {
-        extraTasks.push((async () => {
-          setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
-          await performStyleCheck(text);
-        })());
+        setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
+        await performStyleCheck(text);
+        await delay(2000); // Wait before next request
       }
 
-      extraTasks.push((async () => {
-        setLoadingText('সারাংশ তৈরি হচ্ছে...');
-        await analyzeContent(text);
-      })());
+      // 4. Content Analysis
+      setLoadingText('সারাংশ তৈরি হচ্ছে...');
+      await analyzeContent(text);
 
-      await Promise.all(extraTasks);
     } catch (error: any) {
       console.error(error);
       showMessage(
@@ -700,6 +704,11 @@ function App() {
     let baseWordOffset = 0;
 
     for (let i = 0; i < chunks.length; i++) {
+      // Add delay between chunk requests if it's not the first one
+      if (i > 0) {
+        await delay(2000);
+      }
+
       const chunk = chunks[i];
       const chunkPrompt = buildMainPrompt(chunk, docType);
 
