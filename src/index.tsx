@@ -295,15 +295,11 @@ type SectionKey =
 
 type ViewFilter = 'all' | 'spelling' | 'punctuation';
 
-const API_VERSION = 'v1';          // v1beta নয়, v1 ব্যবহার করছি
-const DEFAULT_MODEL = 'gemini-1.5-flash';
-
 function App() {
   // Settings State
+  // FIX: Default model set to gemini-2.5-flash as per user requirement
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [selectedModel, setSelectedModel] = useState(
-    localStorage.getItem('gemini_model') || DEFAULT_MODEL
-  );
+  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.5-flash');
   const [docType, setDocType] = useState<DocType>(
     (localStorage.getItem('doc_type') as DocType) || 'generic'
   );
@@ -352,6 +348,7 @@ function App() {
     setTimeout(() => setMessage(null), 4000);
   };
 
+  // Helper for Rate Limiting (Delay)
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const saveSettings = () => {
@@ -371,23 +368,8 @@ function App() {
     return str.trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
   };
 
-  const chunkText = (text: string, maxChars = 2500): string[] => {
-    const chunks: string[] = [];
-    let start = 0;
-    const len = text.length;
-    while (start < len) {
-      let end = Math.min(len, start + maxChars);
-      if (end < len) {
-        const lastNewline = text.lastIndexOf('\n', end);
-        if (lastNewline > start + 200) {
-          end = lastNewline;
-        }
-      }
-      chunks.push(text.slice(start, end));
-      start = end;
-    }
-    return chunks;
-  };
+  // NOTE: Chunking function removed for main execution logic, but keeping helper if needed later.
+  // We will now send full text.
 
   /* --- WORD API INTERACTION --- */
   const getTextFromWord = async (): Promise<string> => {
@@ -557,12 +539,12 @@ function App() {
     }).catch(console.error);
   };
 
-  /* --- GEMINI JSON HELPER (v1, gemini-1.5-flash) --- */
+  /* --- GEMINI JSON HELPER --- */
   const callGeminiJson = async (
     prompt: string,
     { temperature = 0.2 }: { temperature?: number } = {}
   ): Promise<any | null> => {
-    const url = `https://generativelanguage.googleapis.com/${API_VERSION}/models/${selectedModel}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
 
     let response: Response;
 
@@ -573,6 +555,7 @@ function App() {
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
+            responseMimeType: 'application/json',
             temperature
           }
         })
@@ -584,34 +567,24 @@ function App() {
 
     if (!response.ok) {
       const status = response.status;
-      const bodyText = await response.text().catch(() => '');
-      let apiMessage = '';
-      try {
-        const parsed = JSON.parse(bodyText);
-        apiMessage = parsed.error?.message || '';
-      } catch {}
-
-      console.error('Gemini API error:', status, bodyText);
-
       let userMessage = '';
 
       if (status === 401 || status === 403) {
         userMessage = 'API Key বা অনুমতি (permission) সংক্রান্ত সমস্যা হয়েছে। Key সঠিক কিনা এবং প্রয়োজনীয় access আছে কিনা চেক করুন।';
       } else if (status === 429) {
-        userMessage = apiMessage && apiMessage.includes('billing')
-          ? 'এই মডেল ব্যবহার করতে Billing চালু থাকতে হবে। Google AI Studio-তে গিয়ে Billing সেটআপ করুন।'
-          : 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে বা কোটা শেষ। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+        userMessage = 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+      } else if (status === 404) {
+        userMessage = `মডেল (${selectedModel}) খুঁজে পাওয়া যায়নি (404)। সেটিংস থেকে সঠিক মডেল (যেমন: gemini-2.5-flash) সিলেক্ট করুন।`;
       } else if (status >= 500) {
         userMessage = 'Gemini সার্ভারে সাময়িক সমস্যা হচ্ছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
       } else if (status === 400) {
-        userMessage = apiMessage
-          ? `Gemini API বলছে:\n${apiMessage}`
-          : 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
+        userMessage = 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা টেক্সট অনেক বেশি বড়।';
       } else {
         userMessage = `Gemini সার্ভার থেকে ত্রুটি (স্ট্যাটাস: ${status})।`;
-        if (apiMessage) userMessage += `\nবিস্তারিত: ${apiMessage}`;
       }
 
+      const bodyText = await response.text().catch(() => '');
+      console.error('Gemini API error:', status, bodyText);
       throw new Error(userMessage);
     }
 
@@ -640,7 +613,7 @@ function App() {
     }
   };
 
-  /* --- API LOGIC (with delays) --- */
+  /* --- API LOGIC (Sequential, NO CHUNKING) --- */
   const checkSpelling = async () => {
     if (!apiKey) {
       showMessage('অনুগ্রহ করে প্রথমে API Key দিন', 'error');
@@ -657,6 +630,7 @@ function App() {
     setIsLoading(true);
     setLoadingText('বিশ্লেষণ করা হচ্ছে...');
     
+    // Reset states
     setCorrections([]);
     setToneSuggestions([]);
     setStyleSuggestions([]);
@@ -669,23 +643,28 @@ function App() {
     await clearHighlights();
 
     try {
+      // 1. Perform Main Check (Whole Text - Single Request)
       setLoadingText('বানান ও ব্যাকরণ দেখা হচ্ছে...');
       await performMainCheck(text);
 
+      // Add Delay (2s) to avoid Rate Limit (5 RPM)
       await delay(2000);
 
+      // 2. Perform Tone Check (if selected)
       if (selectedTone) {
         setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
         await performToneCheck(text);
-        await delay(2000);
+        await delay(2000); 
       }
 
+      // 3. Perform Style Check (if selected)
       if (selectedStyle !== 'none') {
         setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
         await performStyleCheck(text);
-        await delay(2000);
+        await delay(2000); 
       }
 
+      // 4. Content Analysis
       setLoadingText('সারাংশ তৈরি হচ্ছে...');
       await analyzeContent(text);
 
@@ -701,77 +680,48 @@ function App() {
     }
   };
 
+  // UPDATED: No loop, sends the whole text at once
   const performMainCheck = async (text: string) => {
-    const chunks = chunkText(text, 2500);
+    
+    // Direct call with the whole text
+    const prompt = buildMainPrompt(text, docType);
+    const result = await callGeminiJson(prompt, { temperature: 0.1 });
+    
+    if (!result) return;
 
-    const allSpelling: Correction[] = [];
-    const allPunct: PunctuationIssue[] = [];
-    const allEuphony: EuphonyImprovement[] = [];
-    let globalMixing: StyleMixing | null = null;
-    const globalMixCorrections: StyleMixingCorrection[] = [];
+    // Process result (no chunk offsetting needed as we sent whole text)
+    const allSpelling: Correction[] = (result.spellingErrors || []).map((e: any) => ({
+      ...e,
+      position: typeof e.position === 'number' ? e.position : undefined
+    }));
 
-    let baseWordOffset = 0;
+    const allPunct: PunctuationIssue[] = (result.punctuationIssues || []).map((p: any) => ({
+      ...p,
+      position: typeof p.position === 'number' ? p.position : undefined
+    }));
 
-    for (let i = 0; i < chunks.length; i++) {
-      if (i > 0) {
-        await delay(2000);
-      }
+    const allEuphony: EuphonyImprovement[] = (result.euphonyImprovements || []).map((e: any) => ({
+      ...e,
+      position: typeof e.position === 'number' ? e.position : undefined
+    }));
 
-      const chunk = chunks[i];
-      const chunkPrompt = buildMainPrompt(chunk, docType);
-
-      const result = await callGeminiJson(chunkPrompt, { temperature: 0.1 });
-      if (!result) continue;
-
-      const spellingErrors: Correction[] = (result.spellingErrors || []).map((e: any) => ({
-        ...e,
-        position: typeof e.position === 'number' ? e.position + baseWordOffset : undefined
-      }));
-
-      const punctIssues: PunctuationIssue[] = (result.punctuationIssues || []).map((p: any) => ({
-        ...p,
-        position: typeof p.position === 'number' ? p.position + baseWordOffset : undefined
-      }));
-
-      const euphony: EuphonyImprovement[] = (result.euphonyImprovements || []).map((e: any) => ({
-        ...e,
-        position: typeof e.position === 'number' ? e.position + baseWordOffset : undefined
-      }));
-
-      const mixing: StyleMixing | null = result.languageStyleMixing || null;
-      if (mixing?.detected) {
-        if (!globalMixing) {
-          globalMixing = {
-            detected: true,
-            recommendedStyle: mixing.recommendedStyle,
-            reason: mixing.reason,
-            corrections: []
-          };
-        }
-        const corr: StyleMixingCorrection[] = (mixing.corrections || []).map((c: any) => ({
+    let globalMixing: StyleMixing | null = result.languageStyleMixing || null;
+    if (globalMixing && globalMixing.corrections) {
+       globalMixing.corrections = globalMixing.corrections.map((c: any) => ({
           ...c,
-          position: typeof c.position === 'number' ? c.position + baseWordOffset : undefined
-        }));
-        globalMixCorrections.push(...corr);
-      }
-
-      allSpelling.push(...spellingErrors);
-      allPunct.push(...punctIssues);
-      allEuphony.push(...euphony);
-
-      const chunkWords = chunk.trim().length > 0 ? chunk.trim().split(/\s+/).filter(Boolean).length : 0;
-      baseWordOffset += chunkWords;
+          position: typeof c.position === 'number' ? c.position : undefined
+       }));
     }
 
+    // Sort results
     allSpelling.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     allPunct.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     allEuphony.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    if (globalMixing) {
-      globalMixing.corrections = (globalMixCorrections || []).sort(
-        (a, b) => (a.position ?? 0) - (b.position ?? 0)
-      );
+    if (globalMixing && globalMixing.corrections) {
+      globalMixing.corrections.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     }
 
+    // Update State
     setCorrections(allSpelling);
     setPunctuationIssues(allPunct);
     setEuphonyImprovements(allEuphony);
@@ -786,6 +736,7 @@ function App() {
       accuracy: words > 0 ? Math.round(((words - errors) / words) * 100) : 100
     });
 
+    // Highlight
     for (const err of allSpelling) {
       await highlightInWord(err.wrong, '#fee2e2', err.position);
     }
@@ -881,58 +832,62 @@ Response format (ONLY valid JSON, no extra text):
     <div className="app-container">
       {/* Header & Toolbar */}
       <div className="header-section">
-        <div className="header-top">
-          <button
-            className="menu-btn header-menu-btn"
-            onClick={() => setActiveModal('mainMenu')}
-            title="মেনু"
-          >
-            ☰
-          </button>
+  <div className="header-top">
+    {/* বাম পাশে মেনু বাটন */}
+    <button
+      className="menu-btn header-menu-btn"
+      onClick={() => setActiveModal('mainMenu')}
+      title="মেনু"
+    >
+      ☰
+    </button>
 
-          <div className="app-title">
-            <h1>🌟 ভাষা মিত্র</h1>
-            <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
-          </div>
+    {/* মাঝে টাইটেল */}
+    <div className="app-title">
+      <h1>🌟 ভাষা মিত্র</h1>
+      <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
+    </div>
 
-          <div className="header-spacer" />
-        </div>
+    {/* ডান পাশে ফাঁকা স্পেসার – শিরোনামকে ঠিকমতো মাঝখানে রাখার জন্য */}
+    <div className="header-spacer" />
+  </div>
 
-        <div className="toolbar">
-          <div className="toolbar-top">
-            <button 
-              onClick={checkSpelling} 
-              disabled={isLoading}
-              className="btn-check"
-            >
-              {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
-            </button>
-          </div>
+  <div className="toolbar">
+    <div className="toolbar-top">
+      {/* শুধু পরীক্ষা বাটন, ডান দিকে */}
+      <button 
+        onClick={checkSpelling} 
+        disabled={isLoading}
+        className="btn-check"
+      >
+        {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
+      </button>
+    </div>
 
-          <div className="toolbar-bottom">
-            <div className="view-filter">
-              <button
-                className={viewFilter === 'all' ? 'active' : ''}
-                onClick={() => setViewFilter('all')}
-              >
-                সব
-              </button>
-              <button
-                className={viewFilter === 'spelling' ? 'active' : ''}
-                onClick={() => setViewFilter('spelling')}
-              >
-                শুধু বানান
-              </button>
-              <button
-                className={viewFilter === 'punctuation' ? 'active' : ''}
-                onClick={() => setViewFilter('punctuation')}
-              >
-                শুধু বিরামচিহ্ন
-              </button>
-            </div>
-          </div>
-        </div>
+    <div className="toolbar-bottom">
+      <div className="view-filter">
+        <button
+          className={viewFilter === 'all' ? 'active' : ''}
+          onClick={() => setViewFilter('all')}
+        >
+          সব
+        </button>
+        <button
+          className={viewFilter === 'spelling' ? 'active' : ''}
+          onClick={() => setViewFilter('spelling')}
+        >
+          শুধু বানান
+        </button>
+        <button
+          className={viewFilter === 'punctuation' ? 'active' : ''}
+          onClick={() => setViewFilter('punctuation')}
+        >
+          শুধু বিরামচিহ্ন
+        </button>
       </div>
+    </div>
+  </div>
+</div>
 
       {/* Selection Display */}
       {(selectedTone || selectedStyle !== 'none' || docType !== 'generic') && (
@@ -974,6 +929,7 @@ Response format (ONLY valid JSON, no extra text):
           </div>
         )}
 
+        {/* Empty State */}
         {!isLoading && stats.totalWords === 0 && !message && (
           <div className="empty-state">
             <div style={{fontSize: '40px', marginBottom: '12px'}}>✨</div>
@@ -982,6 +938,7 @@ Response format (ONLY valid JSON, no extra text):
           </div>
         )}
 
+        {/* Stats */}
         {stats.totalWords > 0 && (
           <div className="stats-grid">
             <div className="stat-card">
@@ -1365,9 +1322,10 @@ Response format (ONLY valid JSON, no extra text):
               <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="আপনার API Key এখানে দিন" />
               
               <label>🤖 AI Model</label>
-              {/* শুধু একটাই মডেল – gemini-1.5-flash */}
               <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}>
-                <option value={DEFAULT_MODEL}>Gemini 1.5 Flash</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Your Current Model)</option>
+                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                <option value="gemma-3-4b">Gemma 3 (4b)</option>
               </select>
 
               <label>📂 ডকুমেন্ট টাইপ (ডিফল্ট)</label>
