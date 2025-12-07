@@ -551,7 +551,7 @@ function App() {
   };
 
   /* --- GEMINI JSON HELPER --- */
-const API_VERSION = 'v1'; // আগে v1beta ছিল
+const API_VERSION = 'v1';
 
 const callGeminiJson = async (
   prompt: string,
@@ -568,7 +568,7 @@ const callGeminiJson = async (
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          responseMimeType: 'application/json',
+          response_mime_type: 'application/json', // ✅ v1 এর সঠিক নাম
           temperature
         }
       })
