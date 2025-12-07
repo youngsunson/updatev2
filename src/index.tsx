@@ -551,11 +551,13 @@ function App() {
   };
 
   /* --- GEMINI JSON HELPER --- */
+const API_VERSION = 'v1'; // আগে v1beta ছিল
+
 const callGeminiJson = async (
   prompt: string,
   { temperature = 0.2 }: { temperature?: number } = {}
 ): Promise<any | null> => {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/${API_VERSION}/models/${selectedModel}:generateContent?key=${apiKey}`;
 
   let response: Response;
 
@@ -583,28 +585,31 @@ const callGeminiJson = async (
     try {
       const parsed = JSON.parse(bodyText);
       apiMessage = parsed.error?.message || '';
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     console.error('Gemini API error:', status, bodyText);
 
-    // ডিফল্ট বাংলা fallback
     let userMessage = '';
 
     if (status === 401 || status === 403) {
       userMessage = 'API Key বা অনুমতি (permission) সংক্রান্ত সমস্যা হয়েছে। Key সঠিক কিনা এবং প্রয়োজনীয় access আছে কিনা চেক করুন।';
     } else if (status === 429) {
-      userMessage = 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+      // 429-এর জন্য আলাদা মেসেজ
+      if (apiMessage.includes('billing') || apiMessage.includes('Enable billing')) {
+        userMessage = 'এই মডেল ব্যবহার করতে বিলিং সেটআপ করা দরকার। AI Studio-তে গিয়ে Billing চালু করুন।';
+      } else {
+        userMessage = 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে বা কোটা শেষ। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+      }
     } else if (status >= 500) {
       userMessage = 'Gemini সার্ভারে সাময়িক সমস্যা হচ্ছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
     } else if (status === 400) {
-      // 400 এর ক্ষেত্রে আসল error message কে অগ্রাধিকার দিচ্ছি
-      if (apiMessage) {
-        userMessage = `Gemini API বলছে:\n${apiMessage}`;
-      } else {
-        userMessage = 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
-      }
+      userMessage = apiMessage
+        ? `Gemini API বলছে:\n${apiMessage}`
+        : 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
+    } else if (status === 404) {
+      userMessage = apiMessage
+        ? `মডেল বা API ভার্সন সঠিক নয়:\n${apiMessage}`
+        : 'নির্বাচিত মডেলটি এই API ভার্সনে পাওয়া যায়নি। Settings থেকে অন্য মডেল নির্বাচন করে দেখুন।';
     } else {
       userMessage = `Gemini সার্ভার থেকে ত্রুটি (স্ট্যাটাস: ${status})।`;
       if (apiMessage) userMessage += `\nবিস্তারিত: ${apiMessage}`;
@@ -614,7 +619,6 @@ const callGeminiJson = async (
   }
 
   const data = await response.json();
-
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return null;
 
