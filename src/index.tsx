@@ -295,10 +295,15 @@ type SectionKey =
 
 type ViewFilter = 'all' | 'spelling' | 'punctuation';
 
+const API_VERSION = 'v1';          // v1beta নয়, v1 ব্যবহার করছি
+const DEFAULT_MODEL = 'gemini-1.5-flash';
+
 function App() {
   // Settings State
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-1.5-flash');
+  const [selectedModel, setSelectedModel] = useState(
+    localStorage.getItem('gemini_model') || DEFAULT_MODEL
+  );
   const [docType, setDocType] = useState<DocType>(
     (localStorage.getItem('doc_type') as DocType) || 'generic'
   );
@@ -347,7 +352,6 @@ function App() {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  // NEW: Delay Helper for Rate Limiting
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const saveSettings = () => {
@@ -553,12 +557,12 @@ function App() {
     }).catch(console.error);
   };
 
-  /* --- GEMINI JSON HELPER --- */
+  /* --- GEMINI JSON HELPER (v1, gemini-1.5-flash) --- */
   const callGeminiJson = async (
     prompt: string,
     { temperature = 0.2 }: { temperature?: number } = {}
   ): Promise<any | null> => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/${API_VERSION}/models/${selectedModel}:generateContent?key=${apiKey}`;
 
     let response: Response;
 
@@ -569,7 +573,6 @@ function App() {
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            responseMimeType: 'application/json',
             temperature
           }
         })
@@ -581,22 +584,34 @@ function App() {
 
     if (!response.ok) {
       const status = response.status;
+      const bodyText = await response.text().catch(() => '');
+      let apiMessage = '';
+      try {
+        const parsed = JSON.parse(bodyText);
+        apiMessage = parsed.error?.message || '';
+      } catch {}
+
+      console.error('Gemini API error:', status, bodyText);
+
       let userMessage = '';
 
       if (status === 401 || status === 403) {
         userMessage = 'API Key বা অনুমতি (permission) সংক্রান্ত সমস্যা হয়েছে। Key সঠিক কিনা এবং প্রয়োজনীয় access আছে কিনা চেক করুন।';
       } else if (status === 429) {
-        userMessage = 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
+        userMessage = apiMessage && apiMessage.includes('billing')
+          ? 'এই মডেল ব্যবহার করতে Billing চালু থাকতে হবে। Google AI Studio-তে গিয়ে Billing সেটআপ করুন।'
+          : 'অনেক বেশি রিকুয়েস্ট পাঠানো হয়েছে বা কোটা শেষ। কিছুক্ষণ বিরতি নিয়ে আবার চেষ্টা করুন (rate limit)।';
       } else if (status >= 500) {
         userMessage = 'Gemini সার্ভারে সাময়িক সমস্যা হচ্ছে। কিছুক্ষণ পর আবার চেষ্টা করুন।';
       } else if (status === 400) {
-        userMessage = 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
+        userMessage = apiMessage
+          ? `Gemini API বলছে:\n${apiMessage}`
+          : 'রিকুয়েস্ট ফরম্যাট সঠিক নয় বা ইনপুট খুব বড় হতে পারে। টেক্সট কিছুটা ছোট করে আবার চেষ্টা করুন।';
       } else {
         userMessage = `Gemini সার্ভার থেকে ত্রুটি (স্ট্যাটাস: ${status})।`;
+        if (apiMessage) userMessage += `\nবিস্তারিত: ${apiMessage}`;
       }
 
-      const bodyText = await response.text().catch(() => '');
-      console.error('Gemini API error:', status, bodyText);
       throw new Error(userMessage);
     }
 
@@ -625,7 +640,7 @@ function App() {
     }
   };
 
-  /* --- API LOGIC (UPDATED WITH DELAYS) --- */
+  /* --- API LOGIC (with delays) --- */
   const checkSpelling = async () => {
     if (!apiKey) {
       showMessage('অনুগ্রহ করে প্রথমে API Key দিন', 'error');
@@ -642,7 +657,6 @@ function App() {
     setIsLoading(true);
     setLoadingText('বিশ্লেষণ করা হচ্ছে...');
     
-    // Reset states
     setCorrections([]);
     setToneSuggestions([]);
     setStyleSuggestions([]);
@@ -655,28 +669,23 @@ function App() {
     await clearHighlights();
 
     try {
-      // 1. Perform Main Check (Spelling/Grammar)
       setLoadingText('বানান ও ব্যাকরণ দেখা হচ্ছে...');
       await performMainCheck(text);
 
-      // Add Delay (2s) to avoid Rate Limit
       await delay(2000);
 
-      // 2. Perform Tone Check (if selected)
       if (selectedTone) {
         setLoadingText('টোন বিশ্লেষণ হচ্ছে...');
         await performToneCheck(text);
-        await delay(2000); // Wait before next request
+        await delay(2000);
       }
 
-      // 3. Perform Style Check (if selected)
       if (selectedStyle !== 'none') {
         setLoadingText('ভাষারীতি বিশ্লেষণ হচ্ছে...');
         await performStyleCheck(text);
-        await delay(2000); // Wait before next request
+        await delay(2000);
       }
 
-      // 4. Content Analysis
       setLoadingText('সারাংশ তৈরি হচ্ছে...');
       await analyzeContent(text);
 
@@ -704,7 +713,6 @@ function App() {
     let baseWordOffset = 0;
 
     for (let i = 0; i < chunks.length; i++) {
-      // Add delay between chunk requests if it's not the first one
       if (i > 0) {
         await delay(2000);
       }
@@ -873,62 +881,58 @@ Response format (ONLY valid JSON, no extra text):
     <div className="app-container">
       {/* Header & Toolbar */}
       <div className="header-section">
-  <div className="header-top">
-    {/* বাম পাশে মেনু বাটন */}
-    <button
-      className="menu-btn header-menu-btn"
-      onClick={() => setActiveModal('mainMenu')}
-      title="মেনু"
-    >
-      ☰
-    </button>
+        <div className="header-top">
+          <button
+            className="menu-btn header-menu-btn"
+            onClick={() => setActiveModal('mainMenu')}
+            title="মেনু"
+          >
+            ☰
+          </button>
 
-    {/* মাঝে টাইটেল */}
-    <div className="app-title">
-      <h1>🌟 ভাষা মিত্র</h1>
-      <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
-    </div>
+          <div className="app-title">
+            <h1>🌟 ভাষা মিত্র</h1>
+            <p>বাংলা বানান ও ব্যাকরণ পরীক্ষক</p>
+          </div>
 
-    {/* ডান পাশে ফাঁকা স্পেসার – শিরোনামকে ঠিকমতো মাঝখানে রাখার জন্য */}
-    <div className="header-spacer" />
-  </div>
+          <div className="header-spacer" />
+        </div>
 
-  <div className="toolbar">
-    <div className="toolbar-top">
-      {/* শুধু পরীক্ষা বাটন, ডান দিকে */}
-      <button 
-        onClick={checkSpelling} 
-        disabled={isLoading}
-        className="btn-check"
-      >
-        {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
-      </button>
-    </div>
+        <div className="toolbar">
+          <div className="toolbar-top">
+            <button 
+              onClick={checkSpelling} 
+              disabled={isLoading}
+              className="btn-check"
+            >
+              {isLoading ? '...' : '🔍 পরীক্ষা করুন'}
+            </button>
+          </div>
 
-    <div className="toolbar-bottom">
-      <div className="view-filter">
-        <button
-          className={viewFilter === 'all' ? 'active' : ''}
-          onClick={() => setViewFilter('all')}
-        >
-          সব
-        </button>
-        <button
-          className={viewFilter === 'spelling' ? 'active' : ''}
-          onClick={() => setViewFilter('spelling')}
-        >
-          শুধু বানান
-        </button>
-        <button
-          className={viewFilter === 'punctuation' ? 'active' : ''}
-          onClick={() => setViewFilter('punctuation')}
-        >
-          শুধু বিরামচিহ্ন
-        </button>
+          <div className="toolbar-bottom">
+            <div className="view-filter">
+              <button
+                className={viewFilter === 'all' ? 'active' : ''}
+                onClick={() => setViewFilter('all')}
+              >
+                সব
+              </button>
+              <button
+                className={viewFilter === 'spelling' ? 'active' : ''}
+                onClick={() => setViewFilter('spelling')}
+              >
+                শুধু বানান
+              </button>
+              <button
+                className={viewFilter === 'punctuation' ? 'active' : ''}
+                onClick={() => setViewFilter('punctuation')}
+              >
+                শুধু বিরামচিহ্ন
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
 
       {/* Selection Display */}
       {(selectedTone || selectedStyle !== 'none' || docType !== 'generic') && (
@@ -970,7 +974,6 @@ Response format (ONLY valid JSON, no extra text):
           </div>
         )}
 
-        {/* Empty State */}
         {!isLoading && stats.totalWords === 0 && !message && (
           <div className="empty-state">
             <div style={{fontSize: '40px', marginBottom: '12px'}}>✨</div>
@@ -979,7 +982,6 @@ Response format (ONLY valid JSON, no extra text):
           </div>
         )}
 
-        {/* Stats */}
         {stats.totalWords > 0 && (
           <div className="stats-grid">
             <div className="stat-card">
@@ -1363,10 +1365,9 @@ Response format (ONLY valid JSON, no extra text):
               <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="আপনার API Key এখানে দিন" />
               
               <label>🤖 AI Model</label>
+              {/* শুধু একটাই মডেল – gemini-1.5-flash */}
               <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash (New & Fast)</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Balanced)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Best Quality)</option>
+                <option value={DEFAULT_MODEL}>Gemini 1.5 Flash</option>
               </select>
 
               <label>📂 ডকুমেন্ট টাইপ (ডিফল্ট)</label>
