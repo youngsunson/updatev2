@@ -298,7 +298,7 @@ type ViewFilter = 'all' | 'spelling' | 'punctuation';
 function App() {
   // Settings State
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState(localStorage.getItem('gemini_model') || 'gemini-1.5-flash');
   const [docType, setDocType] = useState<DocType>(
     (localStorage.getItem('doc_type') as DocType) || 'generic'
   );
