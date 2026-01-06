@@ -32,7 +32,7 @@
   </Hosts>
   
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://youngsunson.github.io/updatev2/index.html"/>
+    <SourceLocation DefaultValue="https://youngsunson.github.io/updatev2/taskpane.html"/>
   </DefaultSettings>
   
   <!-- ReadWriteDocument is needed to read and insert text into the document -->
@@ -90,7 +90,7 @@
       
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://youngsunson.github.io/updatev2"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://youngsunson.github.io/updatev2/index.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://youngsunson.github.io/updatev2/taskpane.html"/>
       </bt:Urls>
       
       <bt:ShortStrings>

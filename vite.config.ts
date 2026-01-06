@@ -93,8 +93,9 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html'),
-        commands: path.resolve(__dirname, 'commands.html')
+        main: path.resolve(__dirname, 'index.html'),         // আপনার ওয়েবসাইটের হোম পেজ
+        taskpane: path.resolve(__dirname, 'taskpane.html'), // অ‌্যাডইনের মূল পেজ (যা আগে index.html ছিল)
+        commands: path.resolve(__dirname, 'commands.html')  // কমান্ড পেজ
       }
     }
   },

@@ -1,14 +1,403 @@
 <!DOCTYPE html>
-<html lang="bn">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ভাষা মিত্র - বানান পরীক্ষক</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-</head>
-<body>
-  <div id="root"></div>
-  <!-- Vite will auto-inject this during build -->
-  <script type="module" src="./src/index.tsx"></script>
-</body>
+<html lang="bn" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ভাষা মিত্র - বাংলা লেখা পরীক্ষক | Microsoft Word Add-in</title>
+    <meta name="description" content="ভাষা মিত্র - Microsoft Word এর জন্য বাংলা লেখা পরীক্ষক ও সংশোধক অ্যাড-ইন।" />
+    <link rel="icon" type="image/svg+xml" href="/assets/icon-32.png" />
+
+    <!-- Google Fonts: Hind Siliguri -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Hind Siliguri', 'sans-serif'],
+            },
+            colors: {
+              emerald: {
+                50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+                400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857',
+                800: '#065f46', 900: '#064e3b',
+              },
+            },
+            animation: {
+              blob: "blob 7s infinite",
+              float: "float 6s ease-in-out infinite",
+            },
+            keyframes: {
+              blob: {
+                "0%": { transform: "translate(0px, 0px) scale(1)" },
+                "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                "100%": { transform: "translate(0px, 0px) scale(1)" },
+              },
+              float: {
+                "0%, 100%": { transform: "translateY(0)" },
+                "50%": { transform: "translateY(-20px)" },
+              }
+            },
+          }
+        }
+      }
+    </script>
+
+    <!-- Office.js -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+    <style>
+      body { font-family: 'Hind Siliguri', sans-serif; }
+      
+      .gradient-text {
+        background: linear-gradient(to right, #059669, #2563eb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      
+      .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+      .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+      
+      .animation-delay-2000 { animation-delay: 2s; }
+      .animation-delay-4000 { animation-delay: 4s; }
+      
+      .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+      .accordion-content.open { max-height: 500px; }
+    </style>
+  </head>
+  <body class="bg-gray-50 text-gray-800 antialiased min-h-screen">
+    
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <div class="flex items-center gap-2">
+            <div class="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center text-white shadow-md">
+              <span class="font-bold text-lg">ভ</span>
+            </div>
+            <span class="font-bold text-xl text-emerald-900 tracking-tight">ভাষা মিত্র</span>
+          </div>
+          <!-- Desktop Menu -->
+          <div class="hidden md:flex items-center gap-8">
+            <a href="#features" class="text-gray-600 hover:text-emerald-600 transition font-medium text-sm">বৈশিষ্ট্য</a>
+            <a href="#install" class="text-gray-600 hover:text-emerald-600 transition font-medium text-sm">ইনস্টল</a>
+            <a href="contact.html" class="text-gray-600 hover:text-emerald-600 transition font-medium text-sm">যোগাযোগ</a>
+            <a href="#download" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-full font-medium transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 text-sm">
+              ডাউনলোড করুন
+            </a>
+          </div>
+          <!-- Mobile Menu Button -->
+          <button id="mobileMenuBtn" class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-emerald-50">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <!-- Mobile Menu -->
+      <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-100 absolute w-full shadow-lg">
+        <div class="px-4 py-4 space-y-3">
+          <a href="#features" class="block text-gray-600 hover:text-emerald-600 py-2 font-medium">বৈশিষ্ট্য</a>
+          <a href="#install" class="block text-gray-600 hover:text-emerald-600 py-2 font-medium">ইনস্টল</a>
+          <a href="contact.html" class="block text-gray-600 hover:text-emerald-600 py-2 font-medium">যোগাযোগ</a>
+          <a href="#download" class="block bg-emerald-600 text-white text-center py-3 rounded-lg font-medium">ডাউনলোড করুন</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section (SIDE-BY-SIDE LAYOUT) -->
+    <header class="pt-28 pb-20 lg:pt-36 lg:pb-28 overflow-hidden relative">
+      <!-- Background Blobs -->
+      <div class="absolute inset-0 z-0 opacity-40 pointer-events-none">
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+        <div class="absolute top-0 right-1/4 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-32 left-1/3 w-96 h-96 bg-yellow-200 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+      </div>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <!-- Grid Layout: Text Left, Image Right -->
+        <div class="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+          
+          <!-- Left Column: Text -->
+          <div class="text-center lg:text-left order-2 lg:order-1">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold mb-6 shadow-sm">
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              Version 2.7.0 উপলব্ধ
+            </div>
+            
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-gray-900">
+              বাংলায় লিখুন <br />
+              <span class="gradient-text">নির্ভুলভাবে</span>
+            </h1>
+            
+            <p class="text-lg sm:text-xl text-gray-600 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+              Microsoft Word এ বাংলা বানান ও ব্যাকরণ পরীক্ষা করুন সহজেই। 
+              ভাষা মিত্র আপনার লেখাকে করে তুলবে শুদ্ধ ও প্রাঞ্জল।
+            </p>
+            
+            <div class="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+              <a href="#download" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-lg font-bold shadow-lg hover:shadow-emerald-500/30 transition transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                বিনামূল্যে ডাউনলোড
+              </a>
+              <a href="#features" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-6 py-3.5 rounded-xl text-lg font-bold shadow-sm hover:shadow-md transition flex items-center justify-center gap-2">
+                বিস্তারিত জানুন
+              </a>
+            </div>
+          </div>
+
+          <!-- Right Column: Visual (Floating Card) -->
+          <div class="order-1 lg:order-2 flex justify-center lg:justify-end">
+            <div class="relative w-full max-w-md animate-float">
+               <!-- Card Container -->
+               <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 transform rotate-1 hover:rotate-0 transition duration-500 relative z-10">
+                  <!-- Card Header -->
+                  <div class="flex items-center gap-3 mb-5 pb-4 border-b border-gray-50">
+                    <div class="w-10 h-10 bg-blue-700 rounded-lg text-white flex items-center justify-center font-bold text-lg shadow-md">W</div>
+                    <div class="text-left">
+                      <div class="text-base font-bold text-gray-800">Microsoft Word</div>
+                      <div class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block">Add-in</div>
+                    </div>
+                  </div>
+                  <!-- Card Content -->
+                  <div class="space-y-4 text-left">
+                    <div class="flex items-start gap-3 p-4 bg-red-50 rounded-xl border-l-4 border-red-400">
+                       <span class="text-red-500 font-bold mt-0.5">✕</span>
+                       <div>
+                         <span class="text-xs font-bold text-red-500 uppercase tracking-wide">ভুল বাক্য</span>
+                         <div class="text-gray-600 line-through decoration-red-400 decoration-2 text-lg">আমরা বংলায় গান গায়</div>
+                       </div>
+                    </div>
+                    <div class="flex items-start gap-3 p-4 bg-emerald-50 rounded-xl border-l-4 border-emerald-500 shadow-sm">
+                       <span class="text-emerald-500 font-bold mt-0.5">✓</span>
+                       <div>
+                         <span class="text-xs font-bold text-emerald-600 uppercase tracking-wide">সংশোধিত</span>
+                         <div class="text-gray-800 font-bold text-lg">আমরা বাংলায় গান গাই</div>
+                       </div>
+                    </div>
+                  </div>
+                  <!-- Card Footer -->
+                  <div class="mt-5 pt-3 border-t border-gray-50 flex justify-end">
+                    <button class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded shadow-sm">সংশোধন করুন</button>
+                  </div>
+               </div>
+               
+               <!-- Decorative Elements behind card -->
+               <div class="absolute -top-5 -right-5 w-20 h-20 bg-yellow-200 rounded-full blur-xl opacity-60 animate-pulse"></div>
+               <div class="absolute -bottom-5 -left-5 w-24 h-24 bg-blue-200 rounded-full blur-xl opacity-60"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </header>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">✨ কেন ব্যবহার করবেন?</h2>
+          <p class="text-lg text-gray-600">আপনার লেখার মান উন্নয়নের জন্য সেরা ফিচারসমূহ</p>
+        </div>
+        
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <!-- Feature 1 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-emerald-50 transition border border-gray-100 hover:border-emerald-100 group card-hover">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">বানান পরীক্ষা</h3>
+            <p class="text-gray-600 leading-relaxed">ভুল বানান স্বয়ংক্রিয়ভাবে শনাক্ত করে সঠিক বানান প্রস্তাব করে।</p>
+          </div>
+          <!-- Feature 2 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-blue-50 transition border border-gray-100 hover:border-blue-100 group card-hover">
+            <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">ব্যাকরণ সংশোধন</h3>
+            <p class="text-gray-600 leading-relaxed">বাক্যের গঠন ও ব্যাকরণগত ভুল নির্ণয় করে সংশোধনী প্রদান করে।</p>
+          </div>
+          <!-- Feature 3 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-purple-50 transition border border-gray-100 hover:border-purple-100 group card-hover">
+            <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">দ্রুত গতি</h3>
+            <p class="text-gray-600 leading-relaxed">এক ক্লিকে ভুল সংশোধন করুন, সময় বাঁচান এবং কাজ দ্রুত শেষ করুন।</p>
+          </div>
+          <!-- Feature 4 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-orange-50 transition border border-gray-100 hover:border-orange-100 group card-hover">
+            <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">Word Integration</h3>
+            <p class="text-gray-600 leading-relaxed">Microsoft Word এর সাথে সম্পূর্ণ সমন্বিত, Home Tab থেকে সহজে ব্যবহার করুন।</p>
+          </div>
+          <!-- Feature 5 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-pink-50 transition border border-gray-100 hover:border-pink-100 group card-hover">
+            <div class="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">সম্পূর্ণ বিনামূল্যে</h3>
+            <p class="text-gray-600 leading-relaxed">কোনো সাবস্ক্রিপশন বা লুকানো চার্জ নেই। সবার জন্য উন্মুক্ত।</p>
+          </div>
+          <!-- Feature 6 -->
+          <div class="p-8 rounded-2xl bg-gray-50 hover:bg-indigo-50 transition border border-gray-100 hover:border-indigo-100 group card-hover">
+            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-3">নিয়মিত আপডেট</h3>
+            <p class="text-gray-600 leading-relaxed">নতুন শব্দ ও বৈশিষ্ট্য যোগ করে নিয়মিত আপডেট প্রদান করা হয়।</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installation Steps -->
+    <section id="install" class="py-20 bg-gray-900 text-white relative overflow-hidden">
+      <div class="absolute inset-0 opacity-20 pointer-events-none">
+        <div class="absolute right-0 top-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+        <div class="absolute left-0 bottom-0 w-96 h-96 bg-emerald-500 rounded-full blur-3xl"></div>
+      </div>
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="text-center mb-16">
+          <h2 class="text-3xl md:text-4xl font-bold mb-4">🚀 সহজ ইনস্টলেশন</h2>
+          <p class="text-gray-300 text-lg">মাত্র ৩টি সহজ ধাপে ব্যবহার শুরু করুন</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <!-- Step 1 -->
+          <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 relative hover:border-emerald-500 transition duration-300">
+            <div class="absolute -top-4 -left-4 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-xl shadow-lg text-white">1</div>
+            <h3 class="text-xl font-bold mb-4 text-emerald-400">ডাউনলোড করুন</h3>
+            <p class="text-gray-400">নিচের ডাউনলোড বাটনে ক্লিক করে <code class="bg-gray-700 px-2 py-0.5 rounded text-xs text-pink-300 font-mono">BhashamitraInstaller.exe</code> ফাইলটি ডাউনলোড করুন।</p>
+          </div>
+          <!-- Step 2 -->
+          <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 relative hover:border-emerald-500 transition duration-300">
+            <div class="absolute -top-4 -left-4 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-xl shadow-lg text-white">2</div>
+            <h3 class="text-xl font-bold mb-4 text-emerald-400">ইনস্টলার চালান</h3>
+            <p class="text-gray-400">ডাউনলোড করা ফাইলটিতে ডাবল ক্লিক করুন। ইনস্টলার স্বয়ংক্রিয়ভাবে সব কাজ সম্পন্ন করবে।</p>
+          </div>
+          <!-- Step 3 -->
+          <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 relative hover:border-emerald-500 transition duration-300">
+            <div class="absolute -top-4 -left-4 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-xl shadow-lg text-white">3</div>
+            <h3 class="text-xl font-bold mb-4 text-emerald-400">Word চালু করুন</h3>
+            <p class="text-gray-400">Word খুলুন এবং <strong>Home Tab</strong> এ ডানদিকে ভাষা মিত্র আইকনটি দেখতে পাবেন।</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="py-20 bg-emerald-50">
+      <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">এখনই ডাউনলোড করুন</h2>
+        <p class="text-lg text-gray-600 mb-10">আপনার বাংলা লেখাকে পরবর্তী স্তরে নিয়ে যান</p>
+        <div class="flex justify-center mb-8">
+          <a href="#" class="inline-flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-5 rounded-2xl font-bold text-xl transition shadow-xl hover:shadow-emerald-500/40 transform hover:-translate-y-1">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            ডাউনলোড ইনস্টলার (.exe)
+          </a>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
+          <span class="flex items-center gap-2"><svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg> ভাইরাস মুক্ত</span>
+          <span class="flex items-center gap-2"><svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg> সম্পূর্ণ বিনামূল্যে</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="py-20 bg-white">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl font-bold text-gray-900">সাধারণ প্রশ্নোত্তর</h2>
+        </div>
+        <div class="space-y-4">
+          <div class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <button class="faq-button w-full flex items-center justify-between p-6 text-left hover:bg-gray-100 transition-colors">
+              <span class="font-semibold text-gray-900 text-lg">Word এ Add-in দেখা যাচ্ছে না?</span>
+              <svg class="faq-icon w-5 h-5 text-gray-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="accordion-content">
+              <div class="px-6 pb-6 text-gray-600">Word বন্ধ করে আবার চালু করুন। অথবা Installer টি Administrator হিসেবে চালান।</div>
+            </div>
+          </div>
+          <div class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+            <button class="faq-button w-full flex items-center justify-between p-6 text-left hover:bg-gray-100 transition-colors">
+              <span class="font-semibold text-gray-900 text-lg">ইন্টারনেট ছাড়া কাজ করবে?</span>
+              <svg class="faq-icon w-5 h-5 text-gray-500 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="accordion-content">
+              <div class="px-6 pb-6 text-gray-600">না, ভাষা মিত্র ব্যবহারের জন্য ইন্টারনেট সংযোগ প্রয়োজন।</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div class="text-center md:text-left">
+            <h4 class="text-2xl font-bold text-emerald-800 mb-2">ভাষা মিত্র</h4>
+            <p class="text-gray-500 text-sm">© 2026 Himadri Biswas. সর্বস্বত্ব সংরক্ষিত।</p>
+            <p class="text-gray-400 text-xs mt-2">Version 2.7.0</p>
+          </div>
+          <!-- Links updated based on request -->
+          <div class="flex flex-wrap gap-4 justify-center md:justify-end">
+             <a href="support.html" class="text-gray-600 hover:text-emerald-600 font-medium text-sm">সাপোর্ট</a>
+             <a href="privacy.html" class="text-gray-600 hover:text-emerald-600 font-medium text-sm">গোপনীয়তা নীতি</a>
+             <a href="terms.html" class="text-gray-600 hover:text-emerald-600 font-medium text-sm">শর্তাবলী</a>
+             <a href="contact.html" class="text-gray-600 hover:text-emerald-600 font-medium text-sm">যোগাযোগ</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Back to Top -->
+    <button id="backToTop" class="fixed bottom-8 right-8 w-12 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full shadow-lg opacity-0 invisible transition-all z-50 flex items-center justify-center transform hover:-translate-y-1">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+    </button>
+
+    <script>
+      // FAQ Logic
+      document.querySelectorAll('.faq-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const content = button.nextElementSibling;
+          const icon = button.querySelector('.faq-icon');
+          content.classList.toggle('open');
+          icon.style.transform = content.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+      });
+
+      // Mobile Menu
+      const mobileBtn = document.getElementById('mobileMenuBtn');
+      const mobileMenu = document.getElementById('mobileMenu');
+      if(mobileBtn && mobileMenu) {
+        mobileBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'));
+        mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => mobileMenu.classList.add('hidden')));
+      }
+
+      // Back to Top
+      const toTop = document.getElementById('backToTop');
+      window.addEventListener('scroll', () => {
+        if(window.scrollY > 500) {
+          toTop.classList.remove('opacity-0', 'invisible');
+        } else {
+          toTop.classList.add('opacity-0', 'invisible');
+        }
+      });
+      toTop.addEventListener('click', () => window.scrollTo({top: 0, behavior: 'smooth'}));
+    </script>
+  </body>
 </html>

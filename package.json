@@ -2,7 +2,7 @@
   "name": "bhasha-mitra-word-addin",
   "version": "2.0.0",
   "description": "Bangla language assistant for Microsoft Word",
-  "main": "index.html",
+  "main": "taskpane.html",
   "scripts": {
     "dev": "vite --port 3000 --host localhost",
     "build": "tsc && vite build",
